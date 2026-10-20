@@ -25,18 +25,18 @@ export const Header: React.FC<HeaderProps> = ({
   onResetDefaults,
 }) => {
   return (
-    <header className="flex items-center justify-between gap-8 px-6 py-3.5 bg-slate-900 border-b border-slate-800 text-white">
+    <header className="flex items-center justify-between gap-6 px-6 py-3.5 bg-slate-900 border-b border-slate-800 text-white">
       {/* Zone 1: Brand Wordmark */}
       <div className="flex items-center gap-3 shrink-0">
-        <div className="w-8 h-8 rounded bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center font-bold text-sm tracking-wider text-white shadow-sm">
-          SiC
+        <div className="w-8 h-8 rounded bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center font-bold text-xs tracking-wider text-white shadow-sm font-mono">
+          8626
         </div>
         <div>
           <span className="text-base font-bold tracking-tight text-white whitespace-nowrap block leading-tight">
-            Vishay SiC461 Lab
+            MPQ8626GD / IS6605A Lab
           </span>
           <span className="text-xs text-slate-400 font-mono block leading-none">
-            Synchronous Buck 4.5V-60V · 10A
+            Synchronous Buck 16V · 6A · QFN-14 (2×3 мм)
           </span>
         </div>
       </div>
@@ -88,7 +88,7 @@ export const Header: React.FC<HeaderProps> = ({
               const p = PRESET_PROFILES.find((x) => x.id === e.target.value);
               if (p) onSelectPreset(p);
             }}
-            className="bg-slate-950 border border-slate-700 text-slate-200 text-xs rounded-md px-2.5 py-1.5 focus:outline-none focus:border-cyan-500"
+            className="bg-slate-950 border border-slate-700 text-slate-200 text-xs rounded-md px-2.5 py-1.5 focus:outline-none focus:border-cyan-500 max-w-[280px] truncate"
           >
             {PRESET_PROFILES.map((p) => (
               <option key={p.id} value={p.id}>
@@ -99,7 +99,7 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
       </div>
 
-      {/* Zone 3: Primary Action & Quick Tools */}
+      {/* Zone 3: Primary Actions & Quick Tools */}
       <div className="flex items-center gap-2 shrink-0">
         <button
           type="button"
@@ -129,16 +129,6 @@ export const Header: React.FC<HeaderProps> = ({
           <FileCode2 className="w-3.5 h-3.5 text-cyan-400" />
           <span>Python скрипт</span>
         </button>
-
-        <a
-          href="/sic461-calculator.zip"
-          download="sic461-calculator.zip"
-          title="Скачать полный проект в ZIP архиве для локального запуска"
-          className="flex items-center gap-2 px-3.5 py-1.5 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-500 rounded-md transition-colors whitespace-nowrap shadow-sm"
-        >
-          <Download className="w-3.5 h-3.5" />
-          <span>Скачать ZIP архив</span>
-        </a>
 
         <button
           type="button"

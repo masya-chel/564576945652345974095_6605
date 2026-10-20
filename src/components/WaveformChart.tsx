@@ -1,6 +1,6 @@
 import React from 'react';
 import { CalculatorInputs, CalculatorResults } from '../types/calculator';
-import { Activity, Flame, Clock, CheckCircle2, AlertTriangle } from 'lucide-react';
+import { Activity, Flame, Clock, CheckCircle2, AlertTriangle, Cpu } from 'lucide-react';
 
 interface WaveformChartProps {
   inputs: CalculatorInputs;
@@ -12,8 +12,6 @@ export const WaveformChart: React.FC<WaveformChartProps> = ({
   results,
 }) => {
   // SVG points for 2 cycles of inductor current triangle wave
-  // Cycle 1: (0, valley) -> (ton, peak) -> (Tsw, valley)
-  // Cycle 2: (Tsw, valley) -> (Tsw + ton, peak) -> (2*Tsw, valley)
   const svgWidth = 600;
   const svgHeight = 220;
   const padLeft = 60;
@@ -24,7 +22,7 @@ export const WaveformChart: React.FC<WaveformChartProps> = ({
   const plotW = svgWidth - padLeft - padRight;
   const plotH = svgHeight - padTop - padBottom;
 
-  const maxScaleCurrent = Math.max(12, results.iPeak * 1.25);
+  const maxScaleCurrent = Math.max(8, results.iPeak * 1.25);
   const minScaleCurrent = 0;
 
   const getY = (val: number) => {
@@ -48,9 +46,12 @@ export const WaveformChart: React.FC<WaveformChartProps> = ({
     L ${padLeft + 2 * periodW} ${yValley}
   `;
 
+  const tonLimitNs = inputs.chipModel === 'MPQ8626GD' ? 50 : 40;
+  const thetaJaEstimate = 45; // ~45 °C/W for QFN-14 with thermal vias to internal planes
+
   return (
     <div className="flex-1 flex flex-col h-full bg-slate-950 p-5 overflow-y-auto space-y-6">
-      {/* Top Telemetry strip */}
+      {/* Top Telemetry Strip */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="bg-slate-900 border border-slate-800 p-4 rounded-lg">
           <span className="text-[11px] text-slate-400 block uppercase font-mono">
@@ -88,7 +89,7 @@ export const WaveformChart: React.FC<WaveformChartProps> = ({
             {results.tonNs} <span className="text-xs text-slate-400">нс</span>
           </div>
           <span className="text-[11px] text-slate-400 block mt-1">
-            Лимит SiC461: ≥ 60 нс
+            Лимит {inputs.chipModel || 'MPQ8626'}: ≥ {tonLimitNs} нс
           </span>
         </div>
 
@@ -115,7 +116,7 @@ export const WaveformChart: React.FC<WaveformChartProps> = ({
             </h3>
           </div>
           <span className="text-xs font-mono text-slate-400">
-            Fsw = {inputs.fswKhz} кГц (T = {(1000 / inputs.fswKhz).toFixed(2)} мкс)
+            Fsw = {results.actualFswKhz} кГц (T = {(1000 / results.actualFswKhz).toFixed(2)} мкс)
           </span>
         </div>
 
@@ -179,42 +180,52 @@ export const WaveformChart: React.FC<WaveformChartProps> = ({
           </h3>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div className="p-3 bg-slate-950 rounded border border-slate-800">
-            <span className="text-xs text-slate-400 block mb-1">Потери проводимости (MOSFETs)</span>
+            <span className="text-xs text-slate-400 block mb-1">Потери проводимости FET</span>
             <span className="text-lg font-mono font-bold text-slate-200">
               {results.conductionLossW} Вт
             </span>
             <p className="text-[11px] text-slate-400 mt-1">
-              Rds(on) верхнего 27 мОм, нижнего 12 мОм
+              HS: 22.6 мОм, LS: 8.1 мОм
             </p>
           </div>
 
           <div className="p-3 bg-slate-950 rounded border border-slate-800">
-            <span className="text-xs text-slate-400 block mb-1">Динамические потери переключения</span>
+            <span className="text-xs text-slate-400 block mb-1">Потери переключения</span>
             <span className="text-lg font-mono font-bold text-slate-200">
               {results.switchingLossW} Вт
             </span>
             <p className="text-[11px] text-slate-400 mt-1">
-              Зависят от Vin, Iout и частоты Fsw ({inputs.fswKhz} кГц)
+              Частота: {results.actualFswKhz} кГц (tr+tf ≈ 12 нс)
             </p>
           </div>
 
           <div className="p-3 bg-slate-950 rounded border border-slate-800">
-            <span className="text-xs text-slate-400 block mb-1">Потери в меди дросселя (DCR)</span>
+            <span className="text-xs text-slate-400 block mb-1">Потери в меди дросселя</span>
             <span className="text-lg font-mono font-bold text-slate-200">
               {results.inductorDcrLossW} Вт
             </span>
             <p className="text-[11px] text-slate-400 mt-1">
-              При типовом сопротивлении обмотки DCR ≈ 12 мОм
+              При типовом DCR дросселя ≈ 7 мОм
+            </p>
+          </div>
+
+          <div className="p-3 bg-slate-950 rounded border border-slate-800">
+            <span className="text-xs text-slate-400 block mb-1">Собственное потребление</span>
+            <span className="text-lg font-mono font-bold text-slate-200">
+              {results.quiescentLossW} Вт
+            </span>
+            <p className="text-[11px] text-slate-400 mt-1">
+              Питание затворов и схема COT
             </p>
           </div>
         </div>
 
         <div className="mt-4 p-3 bg-slate-950/70 border border-slate-800 rounded text-xs text-slate-300 flex items-center gap-3">
-          <Clock className="w-4 h-4 text-cyan-400 shrink-0" />
+          <Cpu className="w-4 h-4 text-cyan-400 shrink-0" />
           <span>
-            При суммарном рассеянии <strong className="text-white">{results.estimatedPowerLossW} Вт</strong> в корпусе PowerPAK MLP55-27L (θJA ≈ 25 °C/Вт при грамотной разводке полигонов меди платы) перегрев кристалла над средой составит всего <strong className="text-emerald-400">~ {(results.estimatedPowerLossW * 25).toFixed(0)} °C</strong>.
+            При суммарном тепловыделении <strong className="text-white">{results.estimatedPowerLossW} Вт</strong> в корпусе QFN-14 (2×3 мм) тепловое сопротивление кристалл-плата θJB = 6.8 °C/Вт (θJA ≈ 40-50 °C/Вт при наличии тепловых переходных отверстий под PGND). Расчетный перегрев кристалла: <strong className="text-emerald-400">~ {(results.estimatedPowerLossW * thetaJaEstimate).toFixed(0)} °C</strong> относительно окружающей среды.
           </span>
         </div>
       </div>

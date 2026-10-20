@@ -3,19 +3,21 @@ import {
   CalculatorInputs,
   CalculatorResults,
   ChipModel,
-  OperatingMode,
+  LightLoadMode,
+  SwitchingFreqOption,
+  VccBiasMode,
 } from '../types/calculator';
 import {
   AlertTriangle,
-  Sliders,
   Cpu,
-  Activity,
-  ShieldCheck,
-  Zap,
   Radio,
-  CheckCircle2,
-  Layers,
-  Flame,
+  Sliders,
+  ShieldAlert,
+  Clock,
+  Zap,
+  Gauge,
+  Sparkles,
+  Settings2,
 } from 'lucide-react';
 
 interface ManualNumericInputProps {
@@ -64,7 +66,7 @@ const ManualNumericInput: React.FC<ManualNumericInputProps> = ({
   const handleBlur = () => {
     isFocusedRef.current = false;
     const parsed = parseFloat(text);
-    if (isNaN(parsed) || text.trim() === '' || parsed <= 0) {
+    if (isNaN(parsed) || text.trim() === '' || parsed < 0) {
       setText(String(value));
     } else {
       setText(String(parsed));
@@ -137,31 +139,64 @@ export const InputPanel: React.FC<InputPanelProps> = ({
   onChange,
 }) => {
   return (
-    <div className="w-full lg:w-[410px] shrink-0 bg-slate-900 border-r border-slate-800 p-5 overflow-y-auto space-y-6 text-slate-200">
-      {/* 0. Header with Chip Selector */}
-      <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-        <div className="flex items-center gap-2">
-          <Cpu className="w-4 h-4 text-cyan-400" />
-          <h2 className="text-sm font-semibold tracking-wide text-white uppercase">
-            Параметры SiC46x
-          </h2>
+    <div className="w-full lg:w-[420px] shrink-0 bg-slate-900 border-r border-slate-800 p-5 overflow-y-auto space-y-5 text-slate-200">
+      {/* 0. Header with Chip Selector and VCC Bias Mode */}
+      <div className="space-y-3 pb-3 border-b border-slate-800">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Cpu className="w-4 h-4 text-cyan-400" />
+            <h2 className="text-sm font-semibold tracking-wide text-white uppercase">
+              Чип и режим питания
+            </h2>
+          </div>
+          <select
+            value={inputs.chipModel || 'MPQ8626GD'}
+            onChange={(e) => {
+              const model = e.target.value as ChipModel;
+              onChange('chipModel', model);
+              if (model === 'IS6605A' && inputs.tssMs === 2.2) {
+                onChange('tssMs', 1.4);
+              } else if (model === 'MPQ8626GD' && inputs.tssMs === 1.4) {
+                onChange('tssMs', 2.2);
+              }
+            }}
+            className="bg-slate-950 border border-cyan-700/80 text-cyan-300 text-xs font-mono font-bold rounded px-2 py-1 focus:outline-none"
+          >
+            <option value="MPQ8626GD">MPQ8626GD (MPS, 16V 6A)</option>
+            <option value="IS6605A">IS6605A (Innovision, 16V 6A)</option>
+          </select>
         </div>
-        <select
-          value={inputs.chipModel || 'SiC461'}
-          onChange={(e) => {
-            const model = e.target.value as ChipModel;
-            onChange('chipModel', model);
-          }}
-          className="bg-slate-950 border border-cyan-700/80 text-cyan-300 text-xs font-mono font-bold rounded px-2 py-1 focus:outline-none"
-        >
-          <option value="SiC461">SiC461 (10A max)</option>
-          <option value="SiC462">SiC462 (6A max)</option>
-          <option value="SiC463">SiC463 (4A max)</option>
-          <option value="SiC464">SiC464 (2A max)</option>
-        </select>
+
+        {/* VCC Bias Selection */}
+        <div className="grid grid-cols-2 gap-2 text-xs">
+          <button
+            type="button"
+            onClick={() => onChange('vccBiasMode', 'internal')}
+            className={`px-2.5 py-1.5 rounded border text-[11px] font-medium text-left transition-colors ${
+              inputs.vccBiasMode === 'internal'
+                ? 'bg-cyan-950/60 border-cyan-500 text-cyan-300'
+                : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <span className="font-bold block">Внутренний LDO</span>
+            <span className="text-[10px] text-slate-400">Vin = 4.0В .. 16В</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => onChange('vccBiasMode', 'external_3v3')}
+            className={`px-2.5 py-1.5 rounded border text-[11px] font-medium text-left transition-colors ${
+              inputs.vccBiasMode === 'external_3v3'
+                ? 'bg-cyan-950/60 border-cyan-500 text-cyan-300'
+                : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <span className="font-bold block">Внешний 3.3В VCC</span>
+            <span className="text-[10px] text-slate-400">Vin от 2.85В (низкий вход)</span>
+          </button>
+        </div>
       </div>
 
-      {/* Warnings Banner if any */}
+      {/* Warnings Banner */}
       {results.warnings.length > 0 && (
         <div className="p-3 bg-amber-950/40 border border-amber-800/80 rounded-lg text-xs space-y-1.5">
           <div className="flex items-center gap-1.5 font-medium text-amber-300">
@@ -176,914 +211,567 @@ export const InputPanel: React.FC<InputPanelProps> = ({
         </div>
       )}
 
-      {/* 1. Конфигурация MODE (Пин 27) */}
-      <div className="space-y-3 p-3 bg-slate-950/80 border border-slate-800 rounded-lg">
+      {/* 1. Конфигурация MODE и частота переключения (Пин 12) */}
+      <div className="space-y-3 p-3.5 bg-slate-950/80 border border-slate-800 rounded-lg">
         <div className="flex items-center justify-between">
           <label className="text-xs font-semibold text-slate-200 tracking-wider uppercase flex items-center gap-1.5">
             <Radio className="w-3.5 h-3.5 text-cyan-400" />
-            <span>MODE (Пин 27) — Режим работы</span>
+            <span>MODE (Пин 12) — Режим и Частота</span>
           </label>
-          <span className="text-[10px] font-mono text-cyan-400 font-bold">
-            {results.rmodeKohm.formatted}
+          <span className="text-[11px] font-mono text-cyan-400 font-bold">
+            {results.modePinConnection}
           </span>
         </div>
 
-        {/* Radio selector for MODE input mode */}
-        <div className="p-2 bg-slate-900 border border-slate-800 rounded space-y-1 text-xs">
-          <span className="text-[10px] uppercase font-mono text-slate-400 block mb-1">
-            Способ выбора режима MODE:
-          </span>
-          <div className="grid grid-cols-2 gap-2">
-            <label className="flex items-center gap-1.5 cursor-pointer text-[11px] text-slate-300 hover:text-white">
-              <input
-                type="radio"
-                name="modeInputMode"
-                value="mode"
-                checked={inputs.modeInputMode === 'mode'}
-                onChange={() => onChange('modeInputMode', 'mode')}
-                className="accent-cyan-500 cursor-pointer"
-              />
-              <span>По списку режимов</span>
-            </label>
-
-            <label className="flex items-center gap-1.5 cursor-pointer text-[11px] text-slate-300 hover:text-white">
-              <input
-                type="radio"
-                name="modeInputMode"
-                value="resistor"
-                checked={inputs.modeInputMode === 'resistor'}
-                onChange={() => onChange('modeInputMode', 'resistor')}
-                className="accent-cyan-500 cursor-pointer"
-              />
-              <span>По резистору R_mode</span>
-            </label>
-          </div>
+        {/* Input Mode Toggle */}
+        <div className="p-2 bg-slate-900 border border-slate-800 rounded text-xs grid grid-cols-2 gap-2">
+          <label className="flex items-center gap-1.5 cursor-pointer text-[11px] text-slate-300 hover:text-white">
+            <input
+              type="radio"
+              name="modeInputMode"
+              value="mode_fsw"
+              checked={inputs.modeInputMode === 'mode_fsw'}
+              onChange={() => onChange('modeInputMode', 'mode_fsw')}
+              className="accent-cyan-500 cursor-pointer"
+            />
+            <span>Режим / Частота</span>
+          </label>
+          <label className="flex items-center gap-1.5 cursor-pointer text-[11px] text-slate-300 hover:text-white">
+            <input
+              type="radio"
+              name="modeInputMode"
+              value="resistor"
+              checked={inputs.modeInputMode === 'resistor'}
+              onChange={() => onChange('modeInputMode', 'resistor')}
+              className="accent-cyan-500 cursor-pointer"
+            />
+            <span>Резистор R_MODE</span>
+          </label>
         </div>
 
-        {inputs.modeInputMode === 'mode' ? (
-          <div>
-            <select
-              value={inputs.operatingMode}
-              onChange={(e) => {
-                const newMode = Number(e.target.value) as OperatingMode;
-                onChange('operatingMode', newMode);
-                let stdR = 2.0;
-                if (newMode === 2) stdR = 301.0;
-                if (newMode === 3) stdR = 499.0;
-                if (newMode === 4) stdR = 1000.0;
-                onChange('rmodeKohm', stdR);
-              }}
-              className="w-full bg-slate-900 border border-slate-700 rounded px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-cyan-500 font-medium"
-            >
-              <option value={1}>Mode 1: PSM + Внутренний LDO VDRV 5V (Rmode = 2.0 кОм)</option>
-              <option value={2}>Mode 2: FCCM + Внутренний LDO VDRV 5V (Rmode = 301 кОм)</option>
-              <option value={3}>Mode 3: FCCM + Внешний VDRV 5V (Rmode = 499 кОм)</option>
-              <option value={4}>Mode 4: PSM + Внешний VDRV 5V (Rmode = 1000 кОм)</option>
-            </select>
+        {inputs.modeInputMode === 'mode_fsw' ? (
+          <div className="space-y-2.5">
+            <div>
+              <span className="text-[10px] uppercase font-mono text-slate-400 block mb-1">
+                Поведение при малых нагрузках (Light-Load):
+              </span>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => onChange('lightLoadMode', 'FCCM')}
+                  className={`py-1.5 px-2 text-xs rounded border text-center font-medium transition-colors ${
+                    inputs.lightLoadMode === 'FCCM'
+                      ? 'bg-blue-600/30 border-blue-500 text-blue-300'
+                      : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white'
+                  }`}
+                >
+                  Forced CCM (Постоянная частота)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onChange('lightLoadMode', 'PulseSkip')}
+                  className={`py-1.5 px-2 text-xs rounded border text-center font-medium transition-colors ${
+                    inputs.lightLoadMode === 'PulseSkip'
+                      ? 'bg-emerald-600/30 border-emerald-500 text-emerald-300'
+                      : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white'
+                  }`}
+                >
+                  Pulse Skip (Энергосбережение)
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <span className="text-[10px] uppercase font-mono text-slate-400 block mb-1">
+                Частота переключения fSW:
+              </span>
+              <div className="grid grid-cols-3 gap-2">
+                {([600, 1100, 2000] as SwitchingFreqOption[]).map((f) => (
+                  <button
+                    key={f}
+                    type="button"
+                    onClick={() => onChange('fswKhz', f)}
+                    className={`py-1.5 px-2 text-xs rounded border font-mono font-bold transition-colors ${
+                      inputs.fswKhz === f
+                        ? 'bg-cyan-600/30 border-cyan-500 text-cyan-300'
+                        : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    {f === 2000 ? '2.0 МГц' : f === 1100 ? '1.1 МГц' : '600 кГц'}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
         ) : (
           <div className="grid grid-cols-2 gap-3">
             <ManualNumericInput
-              label="Резистор R_mode"
+              label="Резистор R_MODE"
               unit="кОм"
               value={inputs.rmodeKohm}
               colorScheme="cyan"
-              hint="2k (M1), 301k (M2), 499k (M3), 1M (M4)"
-              onChange={(val) => {
-                onChange('rmodeKohm', val);
-                let detected: OperatingMode = 1;
-                if (val <= 10) detected = 1;
-                else if (val <= 400) detected = 2;
-                else if (val <= 750) detected = 3;
-                else detected = 4;
-                onChange('operatingMode', detected);
-              }}
+              onChange={(val) => onChange('rmodeKohm', val)}
+              hint="0к=AGND, 30.1к, 60.4к, 121к, 243к, >350к=VCC"
             />
-            <div className="text-[11px] font-mono text-slate-300 flex flex-col justify-center">
-              <span className="text-slate-400 text-[10px]">Распознан:</span>
-              <span className="text-emerald-400 font-bold">Mode {results.detectedMode}</span>
+            <div className="text-[11px] p-2 bg-slate-900 rounded border border-slate-800 flex flex-col justify-center">
+              <span className="text-slate-400">Распознано:</span>
+              <span className="font-mono text-cyan-300 font-bold">
+                {results.detectedLightLoadMode} @ {results.actualFswKhz} кГц
+              </span>
             </div>
           </div>
         )}
 
-        <p className="text-[10px] text-slate-400 leading-tight">
+        <div className="text-[10px] text-slate-400 bg-slate-900/60 p-2 rounded border border-slate-800">
           {results.modeDescription}
-        </p>
-
-        {/* Ultrasonic pin 18 */}
-        <label className="flex items-center gap-2 cursor-pointer text-xs text-slate-300 pt-1 border-t border-slate-800">
-          <input
-            type="checkbox"
-            checked={inputs.ultrasonicEnabled}
-            onChange={(e) => onChange('ultrasonicEnabled', e.target.checked)}
-            className="accent-cyan-500 rounded cursor-pointer"
-          />
-          <span className="text-[11px]">
-            ULTRASONIC (Пин 18): частота холостого хода &gt; 25 кГц (0 Ω к VDD)
-          </span>
-        </label>
+        </div>
       </div>
 
-      {/* 2. Входное напряжение (VIN) */}
-      <div className="space-y-3">
-        <label className="text-xs font-semibold text-slate-400 tracking-wider uppercase block">
-          Входное напряжение (VIN)
+      {/* 2. Основные электрические параметры (Power Stage) */}
+      <div className="space-y-3 p-3.5 bg-slate-950/80 border border-slate-800 rounded-lg">
+        <label className="text-xs font-semibold text-slate-200 tracking-wider uppercase flex items-center gap-1.5">
+          <Zap className="w-3.5 h-3.5 text-amber-400" />
+          <span>Силовая ступень: Напряжения и Ток</span>
         </label>
-        
+
+        {/* VIN Inputs */}
         <div className="grid grid-cols-3 gap-2">
           <ManualNumericInput
-            label="Мин. (В)"
-            value={inputs.vinMin}
-            min={4.5}
-            max={60}
-            onChange={(val) => onChange('vinMin', val)}
-          />
-          <ManualNumericInput
-            label="Ном. (В)"
+            label="VIN Nom"
+            unit="В"
             value={inputs.vinNom}
-            min={4.5}
-            max={60}
-            colorScheme="cyan"
             onChange={(val) => onChange('vinNom', val)}
           />
           <ManualNumericInput
-            label="Макс. (В)"
+            label="VIN Min"
+            unit="В"
+            value={inputs.vinMin}
+            onChange={(val) => onChange('vinMin', val)}
+          />
+          <ManualNumericInput
+            label="VIN Max"
+            unit="В"
             value={inputs.vinMax}
-            min={4.5}
-            max={60}
             onChange={(val) => onChange('vinMax', val)}
           />
         </div>
-      </div>
 
-      {/* 3. Выходное напряжение и делитель VFB (Пин 22) */}
-      <div className="space-y-3 pt-3 border-t border-slate-800">
-        <div className="flex items-center justify-between">
-          <label className="text-xs font-semibold text-slate-400 tracking-wider uppercase block">
-            Выходная цепь и VFB (Пин 22)
+        {/* VOUT Mode Switcher */}
+        <div className="p-2 bg-slate-900 border border-slate-800 rounded text-xs grid grid-cols-2 gap-2">
+          <label className="flex items-center gap-1.5 cursor-pointer text-[11px] text-slate-300 hover:text-white">
+            <input
+              type="radio"
+              name="voutInputMode"
+              value="voltage"
+              checked={inputs.voutInputMode === 'voltage'}
+              onChange={() => onChange('voutInputMode', 'voltage')}
+              className="accent-cyan-500 cursor-pointer"
+            />
+            <span>Напряжение VOUT</span>
           </label>
-          <span className="text-[10px] font-mono text-emerald-400">
-            Vref = 0.800 В
-          </span>
+          <label className="flex items-center gap-1.5 cursor-pointer text-[11px] text-slate-300 hover:text-white">
+            <input
+              type="radio"
+              name="voutInputMode"
+              value="resistors"
+              checked={inputs.voutInputMode === 'resistors'}
+              onChange={() => onChange('voutInputMode', 'resistors')}
+              className="accent-cyan-500 cursor-pointer"
+            />
+            <span>Делитель R1 / R2</span>
+          </label>
         </div>
 
-        {/* Radio Button Selector: Mode of Definition */}
-        <div className="p-2 bg-slate-950/70 border border-slate-800 rounded-md space-y-1 text-xs">
-          <span className="text-[10px] uppercase font-mono text-slate-400 block mb-1">
-            Способ задания выходного напряжения:
-          </span>
-          <div className="grid grid-cols-2 gap-2">
-            <label className="flex items-center gap-1.5 cursor-pointer text-[11px] text-slate-300 hover:text-white">
-              <input
-                type="radio"
-                name="voutInputMode"
-                value="voltage"
-                checked={inputs.voutInputMode === 'voltage'}
-                onChange={() => onChange('voutInputMode', 'voltage')}
-                className="accent-emerald-500 cursor-pointer"
-              />
-              <span>По числу Vout (В)</span>
-            </label>
-
-            <label className="flex items-center gap-1.5 cursor-pointer text-[11px] text-slate-300 hover:text-white">
-              <input
-                type="radio"
-                name="voutInputMode"
-                value="resistors"
-                checked={inputs.voutInputMode === 'resistors'}
-                onChange={() => onChange('voutInputMode', 'resistors')}
-                className="accent-emerald-500 cursor-pointer"
-              />
-              <span>По резисторам делителя</span>
-            </label>
+        {inputs.voutInputMode === 'voltage' ? (
+          <div className="grid grid-cols-2 gap-3">
+            <ManualNumericInput
+              label="Выходное VOUT"
+              unit="В"
+              value={inputs.vout}
+              colorScheme="emerald"
+              onChange={(val) => onChange('vout', val)}
+              hint={`Vref = 0.600В (диапазон 0.6В .. ${inputs.chipModel === 'MPQ8626GD' ? '6.0В' : '5.5В'})`}
+            />
+            <ManualNumericInput
+              label="Макс. ток IOUT"
+              unit="А"
+              value={inputs.ioutMax}
+              colorScheme="amber"
+              onChange={(val) => onChange('ioutMax', val)}
+              hint="Паспортный максимум чипа: 6.0 А"
+            />
           </div>
-        </div>
-
-        <div className="grid grid-cols-2 gap-3">
-          <ManualNumericInput
-            label="Напряжение Vout"
-            unit="В"
-            value={inputs.vout}
-            min={0.8}
-            max={55}
-            colorScheme={inputs.voutInputMode === 'voltage' ? 'emerald' : 'default'}
-            disabled={inputs.voutInputMode === 'resistors'}
-            hint={
-              inputs.voutInputMode === 'voltage'
-                ? `Стандарт E96: R_FB_H = ${results.rfbTop.nominal} кОм`
-                : 'Рассчитано из R_FB_H / R_FB_L'
-            }
-            onChange={(val) => {
-              onChange('vout', val);
-              const syncedRfb1 = Number((inputs.rfb2Kohm * (val / 0.800 - 1)).toFixed(2));
-              onChange('rfb1Kohm', syncedRfb1);
-              const syncedRfsw = Number((val / (1.9e-10 * (inputs.fswKhz * 1000) * 1000)).toFixed(2));
-              onChange('rfswKohm', syncedRfsw);
-            }}
-          />
-
-          <ManualNumericInput
-            label="Макс. ток Iout"
-            unit="А"
-            value={inputs.ioutMax}
-            min={0.1}
-            max={results.maxRatedCurrentA}
-            colorScheme="amber"
-            hint={`Лимит ${inputs.chipModel}: ${results.maxRatedCurrentA} А`}
-            onChange={(val) => onChange('ioutMax', val)}
-          />
-        </div>
-
-        {/* Resistor Divider RFB1 & RFB2 */}
-        <div className={`p-2.5 rounded-lg border transition-colors space-y-2 ${
-          inputs.voutInputMode === 'resistors'
-            ? 'bg-purple-950/30 border-purple-800/80'
-            : 'bg-slate-950/60 border-slate-800'
-        }`}>
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] uppercase font-mono text-slate-400">
-              Делитель на выводе VFB (Пин 22):
-            </span>
-            {inputs.voutInputMode === 'resistors' && (
-              <span className="text-[10px] font-mono text-purple-300 font-semibold px-1.5 py-0.5 rounded bg-purple-900/60">
-                Задающий режим
+        ) : (
+          <div className="space-y-2">
+            <div className="grid grid-cols-2 gap-3">
+              <ManualNumericInput
+                label="Верхний R1 (VOUT→FB)"
+                unit="кОм"
+                value={inputs.r1Kohm}
+                colorScheme="cyan"
+                onChange={(val) => onChange('r1Kohm', val)}
+                hint="Рекомендуется 2.0 .. 10.0 кОм"
+              />
+              <ManualNumericInput
+                label="Нижний R2 (FB→AGND)"
+                unit="кОм"
+                value={inputs.r2Kohm}
+                colorScheme="cyan"
+                onChange={(val) => onChange('r2Kohm', val)}
+                hint="R2 = R1 · 0.6 / (Vout - 0.6)"
+              />
+            </div>
+            <div className="flex items-center justify-between text-xs p-2 bg-slate-900 rounded font-mono">
+              <span className="text-slate-400">Фактический Vout:</span>
+              <span className="text-emerald-400 font-bold">
+                {results.voutActual} В ({results.voutErrorPercent > 0 ? '+' : ''}{results.voutErrorPercent}%)
               </span>
-            )}
+            </div>
           </div>
+        )}
 
-          <div className="grid grid-cols-2 gap-2">
-            <ManualNumericInput
-              label="Верхний R_FB_H"
-              unit="кОм"
-              value={inputs.rfb1Kohm}
-              colorScheme={inputs.voutInputMode === 'resistors' ? 'purple' : 'default'}
-              disabled={inputs.voutInputMode === 'voltage'}
-              hint={`Ближайший E96: ${results.rfbTop.nominal} кОм`}
-              onChange={(newRfb1) => {
-                onChange('rfb1Kohm', newRfb1);
-                const newVout = Number((0.800 * (1 + newRfb1 / inputs.rfb2Kohm)).toFixed(3));
-                onChange('vout', newVout);
-              }}
-            />
-
-            <ManualNumericInput
-              label="Нижний R_FB_L"
-              unit="кОм"
-              value={inputs.rfb2Kohm}
-              colorScheme={inputs.voutInputMode === 'resistors' ? 'purple' : 'default'}
-              disabled={inputs.voutInputMode === 'voltage'}
-              hint="Стандартно 10.0 кОм"
-              onChange={(newRfb2) => {
-                onChange('rfb2Kohm', newRfb2);
-                if (newRfb2 > 0) {
-                  const newVout = Number((0.800 * (1 + inputs.rfb1Kohm / newRfb2)).toFixed(3));
-                  onChange('vout', newVout);
-                }
-              }}
-            />
-          </div>
-        </div>
-
+        {/* Ripple & Ripple Ratio Kind */}
         <div className="grid grid-cols-2 gap-3">
           <ManualNumericInput
-            label="Пульсации Vout"
+            label="Пульсации дросселя Kind"
+            unit="ΔIL/Iout"
+            value={inputs.kind}
+            onChange={(val) => onChange('kind', val)}
+            hint="Рекомендуется 0.25 .. 0.40"
+          />
+          <ManualNumericInput
+            label="Макс. пульсации VOUT"
             unit="мВ"
             value={inputs.voutRippleMaxMv}
-            min={5}
-            max={500}
-            hint={`${((inputs.voutRippleMaxMv / (inputs.vout * 1000)) * 100).toFixed(1)}% от Vout`}
             onChange={(val) => onChange('voutRippleMaxMv', val)}
+            hint="Для подбора емкости COUT"
           />
+        </div>
 
+        {/* Transient Step */}
+        <div className="grid grid-cols-2 gap-3">
           <ManualNumericInput
-            label="Шаг тока ΔIstep"
+            label="Ступень нагрузки ΔI"
             unit="А"
             value={inputs.loadStepA}
-            min={0.1}
-            max={inputs.ioutMax}
-            hint="Для расчета Cout"
             onChange={(val) => onChange('loadStepA', val)}
           />
+          <ManualNumericInput
+            label="Допустимый выброс ΔV"
+            unit="мВ"
+            value={inputs.voltageOvershootMv}
+            onChange={(val) => onChange('voltageOvershootMv', val)}
+          />
         </div>
       </div>
 
-      {/* 4. Частота FSW (Пин 24) */}
-      <div className="space-y-3 pt-3 border-t border-slate-800">
+      {/* 3. Ограничение тока и защита OCP (Пин 4 CS) */}
+      <div className="space-y-3 p-3.5 bg-slate-950/80 border border-slate-800 rounded-lg">
         <div className="flex items-center justify-between">
-          <label className="text-xs font-semibold text-slate-400 tracking-wider uppercase block">
-            Частота и fSW (Пин 24)
+          <label className="text-xs font-semibold text-slate-200 tracking-wider uppercase flex items-center gap-1.5">
+            <ShieldAlert className="w-3.5 h-3.5 text-amber-400" />
+            <span>CS (Пин 4) — Токовый предел</span>
           </label>
-          <span className="text-[10px] font-mono text-cyan-400">
-            Rfsw = Vout / (fsw · 1.9e-10)
+          <span className="text-[11px] font-mono text-amber-300 font-bold">
+            R_CS = {results.rcsKohm.formatted}
           </span>
         </div>
 
-        {/* Radio Button Selector: Frequency Mode */}
-        <div className="p-2 bg-slate-950/70 border border-slate-800 rounded-md space-y-1 text-xs">
-          <span className="text-[10px] uppercase font-mono text-slate-400 block mb-1">
-            Способ задания частоты:
-          </span>
-          <div className="grid grid-cols-2 gap-2">
-            <label className="flex items-center gap-1.5 cursor-pointer text-[11px] text-slate-300 hover:text-white">
-              <input
-                type="radio"
-                name="fswInputMode"
-                value="frequency"
-                checked={inputs.fswInputMode === 'frequency'}
-                onChange={() => onChange('fswInputMode', 'frequency')}
-                className="accent-cyan-500 cursor-pointer"
-              />
-              <span>По частоте Fsw (кГц)</span>
-            </label>
-
-            <label className="flex items-center gap-1.5 cursor-pointer text-[11px] text-slate-300 hover:text-white">
-              <input
-                type="radio"
-                name="fswInputMode"
-                value="resistor"
-                checked={inputs.fswInputMode === 'resistor'}
-                onChange={() => onChange('fswInputMode', 'resistor')}
-                className="accent-cyan-500 cursor-pointer"
-              />
-              <span>По резистору R_fsw (кОм)</span>
-            </label>
-          </div>
+        <div className="p-2 bg-slate-900 border border-slate-800 rounded text-xs grid grid-cols-2 gap-2">
+          <label className="flex items-center gap-1.5 cursor-pointer text-[11px] text-slate-300 hover:text-white">
+            <input
+              type="radio"
+              name="currentLimitInputMode"
+              value="current"
+              checked={inputs.currentLimitInputMode === 'current'}
+              onChange={() => onChange('currentLimitInputMode', 'current')}
+              className="accent-cyan-500 cursor-pointer"
+            />
+            <span>По пределу тока (А)</span>
+          </label>
+          <label className="flex items-center gap-1.5 cursor-pointer text-[11px] text-slate-300 hover:text-white">
+            <input
+              type="radio"
+              name="currentLimitInputMode"
+              value="resistor"
+              checked={inputs.currentLimitInputMode === 'resistor'}
+              onChange={() => onChange('currentLimitInputMode', 'resistor')}
+              className="accent-cyan-500 cursor-pointer"
+            />
+            <span>По резистору R_CS</span>
+          </label>
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
+        {inputs.currentLimitInputMode === 'current' ? (
           <ManualNumericInput
-            label="Частота Fsw"
-            unit="кГц"
-            value={inputs.fswKhz}
-            min={100}
-            max={2000}
-            colorScheme={inputs.fswInputMode === 'frequency' ? 'cyan' : 'default'}
-            disabled={inputs.fswInputMode === 'resistor'}
-            hint={`Ближайший E96: ${results.rfswKohm.nominal} кОм`}
-            onChange={(val) => {
-              onChange('fswKhz', val);
-              const syncedRfsw = Number((inputs.vout / (1.9e-10 * (val * 1000) * 1000)).toFixed(2));
-              onChange('rfswKohm', syncedRfsw);
-            }}
+            label="Целевой предел тока I_OC"
+            unit="А"
+            value={inputs.ilimTargetA}
+            colorScheme="amber"
+            onChange={(val) => onChange('ilimTargetA', Math.min(8.0, val))}
+            hint="Диапазон: 4.0 А .. 8.0 А (Vocp = 1.2В, Gcs = 40 мкА/А)"
           />
-
+        ) : (
           <ManualNumericInput
-            label="Резистор R_fsw"
+            label="Резистор R_CS к AGND"
             unit="кОм"
-            value={inputs.rfswKohm}
-            colorScheme={inputs.fswInputMode === 'resistor' ? 'cyan' : 'default'}
-            disabled={inputs.fswInputMode === 'frequency'}
-            hint={`Дает Fsw = ${results.actualFswKhz} кГц`}
-            onChange={(newRfsw) => {
-              onChange('rfswKohm', newRfsw);
-              if (newRfsw > 0) {
-                const newFswKhz = Number((inputs.vout / (1.9e-10 * (newRfsw * 1000) * 1000)).toFixed(1));
-                onChange('fswKhz', newFswKhz);
-              }
-            }}
+            value={inputs.rcsKohm}
+            colorScheme="amber"
+            onChange={(val) => onChange('rcsKohm', val)}
+            hint="Формула: Rcs = 1.2 / (40e-6 · Ivalley)"
           />
-        </div>
+        )}
 
-        <div>
-          <ManualNumericInput
-            label="Коэффициент пульсаций дросселя Kind (ΔIL / Iout)"
-            value={inputs.kind}
-            min={0.1}
-            max={0.8}
-            hint="Рекомендация: 0.2 .. 0.4 (по умолчанию 0.3)"
-            onChange={(val) => onChange('kind', val)}
-          />
-        </div>
-      </div>
-
-      {/* 5. Бутстреп и PHASE1, PHASE2 (Пины 4, 5, 6) */}
-      <div className="space-y-3 pt-3 border-t border-slate-800">
-        <div className="flex items-center justify-between">
-          <label className="text-xs font-semibold text-slate-400 tracking-wider uppercase block">
-            BOOT & PHASE1, PHASE2 (Пины 4, 5, 6)
-          </label>
-          <span className="text-[10px] font-mono text-cyan-400">
-            Cboot = {results.cbootNf.formatted}
-          </span>
-        </div>
-
-        <div className="p-2 bg-slate-950/70 border border-slate-800 rounded-md space-y-1 text-xs">
-          <span className="text-[10px] uppercase font-mono text-slate-400 block mb-1">
-            Номиналы бутстрепа:
-          </span>
-          <div className="grid grid-cols-2 gap-2">
-            <label className="flex items-center gap-1.5 cursor-pointer text-[11px] text-slate-300 hover:text-white">
-			  <input
-				type="radio"
-				name="bootInputMode"
-				value="standard"
-				checked={inputs.bootInputMode === 'standard'}
-				onChange={() => {
-				  onChange('bootInputMode', 'standard');
-				  // Автоматически подставляем стандартные значения из даташита
-				  const defaultRboot = (inputs.chipModel === 'SiC463' || inputs.chipModel === 'SiC464') ? 4.7 : 3.3;
-				  onChange('rbootOhm', defaultRboot);
-				  onChange('cbootNf', 100); // 100 нФ (0.1 мкФ)
-				}}
-				className="accent-cyan-500 cursor-pointer"
-			  />
-			  <span>Стандарт Vishay</span>
-			</label>
-
-            <label className="flex items-center gap-1.5 cursor-pointer text-[11px] text-slate-300 hover:text-white">
-              <input
-                type="radio"
-                name="bootInputMode"
-                value="custom"
-                checked={inputs.bootInputMode === 'custom'}
-                onChange={() => onChange('bootInputMode', 'custom')}
-                className="accent-cyan-500 cursor-pointer"
-              />
-              <span>Свой подбор</span>
-            </label>
+        <div className="grid grid-cols-2 gap-2 text-[11px] p-2 bg-slate-900 rounded border border-slate-800 font-mono">
+          <div>
+            <span className="text-slate-400 block text-[10px]">Порог впадины:</span>
+            <span className="text-amber-300 font-bold">{results.actualIlimValleyA} А</span>
+          </div>
+          <div>
+            <span className="text-slate-400 block text-[10px]">Эквивалент Ilim_dc:</span>
+            <span className="text-emerald-400 font-bold">~ {results.actualIlimDcA} А</span>
           </div>
         </div>
-
-        <div className="grid grid-cols-2 gap-3">
-          <ManualNumericInput
-            label="Резистор R_boot"
-            unit="Ω"
-            value={inputs.rbootOhm}
-            disabled={inputs.bootInputMode === 'standard'}
-            colorScheme={inputs.bootInputMode === 'custom' ? 'cyan' : 'default'}
-            hint="Демпфирование dV/dt (EMI)"
-            onChange={(val) => onChange('rbootOhm', val)}
-          />
-
-          <ManualNumericInput
-            label="Конденсатор C_boot"
-            unit="нФ"
-            value={inputs.cbootNf}
-            disabled={inputs.bootInputMode === 'standard'}
-            colorScheme={inputs.bootInputMode === 'custom' ? 'cyan' : 'default'}
-            hint="100 нF X7R ≥25V"
-            onChange={(val) => onChange('cbootNf', val)}
-          />
-        </div>
-        <p className="text-[10px] text-slate-400 leading-tight">
-          Резистор R_BOOT включается между выводом BOOT (4) и выводами PHASE1/PHASE2 (5, 6) для ограничения скорости нарастания напряжения и подавления высокочастотного звона.
-        </p>
       </div>
 
-      {/* 6. Питание затворов VDRV (Пин 16) */}
-      <div className="p-3 bg-slate-950/70 border border-slate-800 rounded-lg space-y-2 text-xs">
+      {/* 4. Плавный пуск и опорное напряжение (Пин 8 TRK/REF) */}
+      <div className="space-y-3 p-3.5 bg-slate-950/80 border border-slate-800 rounded-lg">
         <div className="flex items-center justify-between">
-          <span className="font-semibold text-slate-300 uppercase tracking-wider text-[11px]">
-            VDRV (Пин 16) — Питание драйверов
-          </span>
-          <span className="font-mono text-cyan-400 font-bold">
-            {results.cvdrvUf.formatted}
-          </span>
-        </div>
-
-        <div className="flex items-center justify-between text-slate-300 pt-1">
-          <span className="text-slate-400">Источник VDRV:</span>
-          <span className="font-semibold text-slate-200">
-            {results.detectedMode === 3 || results.detectedMode === 4
-              ? 'Внешний 5.0В (Mode 3/4)'
-              : 'Внутренний LDO 5.0В (Mode 1/2)'}
-          </span>
-        </div>
-
-        <div className="flex items-center justify-between text-slate-300">
-          <span className="text-slate-400">Потери в LDO регуляторе:</span>
-          <span className={`font-mono font-bold ${results.vdrvPowerLossW > 0.5 ? 'text-amber-400' : 'text-emerald-400'}`}>
-            {results.vdrvPowerLossW} Вт
-          </span>
-        </div>
-
-        <p className="text-[10px] text-slate-400 leading-tight">
-          Конденсатор CVDRV = 4.7 µF X7R 10V+ монтируется непосредственно между выводами 16 и PGND. В режимах Mode 3 и 4 при внешнем питании 5В потери в кристалле отсутствуют.
-        </p>
-      </div>
-
-      {/* 7. Компенсация контура COMP (Пин 21) */}
-      <div className="space-y-3 pt-3 border-t border-slate-800">
-        <div className="flex items-center justify-between">
-          <label className="text-xs font-semibold text-slate-400 tracking-wider uppercase block">
-            Петля компенсации COMP (Пин 21)
+          <label className="text-xs font-semibold text-slate-200 tracking-wider uppercase flex items-center gap-1.5">
+            <Clock className="w-3.5 h-3.5 text-cyan-400" />
+            <span>TRK/REF (Пин 8) — Soft-Start</span>
           </label>
-          <span className="text-[10px] font-mono text-emerald-400 font-bold">
-            fc ≈ {results.crossoverFreqKhz} кГц
+          <span className="text-[11px] font-mono text-cyan-400 font-bold">
+            Tss = {results.actualTssMs} мс
           </span>
         </div>
 
-        <div className="p-2 bg-slate-950/70 border border-slate-800 rounded-md space-y-1 text-xs">
-          <span className="text-[10px] uppercase font-mono text-slate-400 block mb-1">
-            Способ задания цепи COMP:
-          </span>
-          <div className="grid grid-cols-2 gap-2">
-            <label className="flex items-center gap-1.5 cursor-pointer text-[11px] text-slate-300 hover:text-white">
-              <input
-                type="radio"
-                name="compInputMode"
-                value="auto"
-                checked={inputs.compInputMode === 'auto'}
-                onChange={() => onChange('compInputMode', 'auto')}
-                className="accent-emerald-500 cursor-pointer"
-              />
-              <span>Авторасчет (gm=300µS)</span>
-            </label>
-
-            <label className="flex items-center gap-1.5 cursor-pointer text-[11px] text-slate-300 hover:text-white">
-              <input
-                type="radio"
-                name="compInputMode"
-                value="manual"
-                checked={inputs.compInputMode === 'manual'}
-                onChange={() => onChange('compInputMode', 'manual')}
-                className="accent-emerald-500 cursor-pointer"
-              />
-              <span>Свои номиналы</span>
-            </label>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 gap-3">
-          <ManualNumericInput
-            label="Резистор R_comp"
-            unit="кОм"
-            value={inputs.rcompKohm}
-            disabled={inputs.compInputMode === 'auto'}
-            colorScheme={inputs.compInputMode === 'manual' ? 'emerald' : 'default'}
-            hint={`Расчетное: ${results.rcompKohm.nominal} кОм`}
-            onChange={(val) => onChange('rcompKohm', val)}
-          />
-
-          <ManualNumericInput
-            label="Конденсатор C_comp"
-            unit="пФ"
-            value={inputs.ccompPf}
-            disabled={inputs.compInputMode === 'auto'}
-            colorScheme={inputs.compInputMode === 'manual' ? 'emerald' : 'default'}
-            hint={`Расчетное: ${results.ccompPf.nominal} пФ`}
-            onChange={(val) => onChange('ccompPf', val)}
-          />
-        </div>
-
-        <div className="p-2 bg-slate-950/60 rounded border border-slate-800 text-[11px] font-mono text-slate-300 flex justify-between">
-          <span className="text-slate-400">Частота LC-полюса фильтра:</span>
-          <span className="text-slate-100 font-bold">{results.lcPoleFreqKhz} кГц</span>
-        </div>
-      </div>
-
-      {/* 8. Инжекция пилы VSNS (Пин 20) */}
-      <div className="space-y-3 pt-3 border-t border-slate-800">
-        <div className="flex items-center justify-between">
-          <label className="text-xs font-semibold text-slate-400 tracking-wider uppercase block">
-            Инжекция пилы VSNS (Пин 20)
+        <div className="p-2 bg-slate-900 border border-slate-800 rounded text-xs grid grid-cols-2 gap-2">
+          <label className="flex items-center gap-1.5 cursor-pointer text-[11px] text-slate-300 hover:text-white">
+            <input
+              type="radio"
+              name="softStartInputMode"
+              value="time"
+              checked={inputs.softStartInputMode === 'time'}
+              onChange={() => onChange('softStartInputMode', 'time')}
+              className="accent-cyan-500 cursor-pointer"
+            />
+            <span>По времени Tss</span>
           </label>
-          <span className={`text-[10px] font-mono font-bold ${results.vrampWarning ? 'text-amber-400' : 'text-cyan-400'}`}>
-            Vramp = {results.vrampMinMv}..{results.vrampMaxMv} мВ
-          </span>
-        </div>
-
-        <div className="p-2 bg-slate-950/70 border border-slate-800 rounded-md space-y-1 text-xs">
-          <span className="text-[10px] uppercase font-mono text-slate-400 block mb-1">
-            Способ задания цепи пилы:
-          </span>
-          <div className="grid grid-cols-2 gap-2">
-            <label className="flex items-center gap-1.5 cursor-pointer text-[11px] text-slate-300 hover:text-white">
-              <input
-                type="radio"
-                name="vsnsInputMode"
-                value="auto"
-                checked={inputs.vsnsInputMode === 'auto'}
-                onChange={() => onChange('vsnsInputMode', 'auto')}
-                className="accent-cyan-500 cursor-pointer"
-              />
-              <span>Авторасчет (COT норма)</span>
-            </label>
-
-            <label className="flex items-center gap-1.5 cursor-pointer text-[11px] text-slate-300 hover:text-white">
-              <input
-                type="radio"
-                name="vsnsInputMode"
-                value="manual"
-                checked={inputs.vsnsInputMode === 'manual'}
-                onChange={() => onChange('vsnsInputMode', 'manual')}
-                className="accent-cyan-500 cursor-pointer"
-              />
-              <span>Свои номиналы Rx, Cy, Cx</span>
-            </label>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-3 gap-2">
-          <ManualNumericInput
-            label="Rx (от SW)"
-            unit="кОм"
-            value={inputs.rxKohm}
-            disabled={inputs.vsnsInputMode === 'auto'}
-            colorScheme={inputs.vsnsInputMode === 'manual' ? 'cyan' : 'default'}
-            hint={`E96: ${results.rxKohm.nominal}k`}
-            onChange={(val) => onChange('rxKohm', val)}
-          />
-
-          <ManualNumericInput
-            label="Cy (к VSNS)"
-            unit="нФ"
-            value={inputs.cyNf}
-            disabled={inputs.vsnsInputMode === 'auto'}
-            colorScheme={inputs.vsnsInputMode === 'manual' ? 'cyan' : 'default'}
-            hint={`E24: ${results.cyNf.nominal}n`}
-            onChange={(val) => onChange('cyNf', val)}
-          />
-
-          <ManualNumericInput
-            label="Cx (к VOUT)"
-            unit="нФ"
-            value={inputs.cxNf}
-            disabled={inputs.vsnsInputMode === 'auto'}
-            colorScheme={inputs.vsnsInputMode === 'manual' ? 'cyan' : 'default'}
-            hint={`E24: ${results.cxNf.nominal}n`}
-            onChange={(val) => onChange('cxNf', val)}
-          />
-        </div>
-
-        <p className="text-[10px] text-slate-400 font-sans leading-tight">
-          Конденсатор <b>Cy</b> подключается к выводу 20 (VSNS), отсекая постоянную составляющую. Цепь <b>Rx</b> и <b>Cx</b> формирует пилу параллельно дросселю (от SW к VOUT).
-        </p>
-      </div>
-
-      {/* 9. Софт-старт (SS Pin 19) */}
-      <div className="space-y-3 pt-3 border-t border-slate-800">
-        <div className="flex items-center justify-between">
-          <label className="text-xs font-semibold text-slate-400 tracking-wider uppercase block">
-            Софт-старт (SS Пин 19)
+          <label className="flex items-center gap-1.5 cursor-pointer text-[11px] text-slate-300 hover:text-white">
+            <input
+              type="radio"
+              name="softStartInputMode"
+              value="capacitor"
+              checked={inputs.softStartInputMode === 'capacitor'}
+              onChange={() => onChange('softStartInputMode', 'capacitor')}
+              className="accent-cyan-500 cursor-pointer"
+            />
+            <span>По емкости C_REF</span>
           </label>
-          <span className="text-[10px] font-mono text-cyan-400">
-            Iss = 5 µA · Vref = 0.8В
-          </span>
         </div>
 
-        {/* Radio Button Selector: Mode of Definition */}
-        <div className="p-2 bg-slate-950/70 border border-slate-800 rounded-md space-y-1 text-xs">
-          <span className="text-[10px] uppercase font-mono text-slate-400 block mb-1">
-            Способ задания софт-старта:
-          </span>
-          <div className="grid grid-cols-2 gap-2">
-            <label className="flex items-center gap-1.5 cursor-pointer text-[11px] text-slate-300 hover:text-white">
-              <input
-                type="radio"
-                name="softStartInputMode"
-                value="time"
-                checked={inputs.softStartInputMode === 'time'}
-                onChange={() => onChange('softStartInputMode', 'time')}
-                className="accent-cyan-500 cursor-pointer"
-              />
-              <span>По времени Tss (мс)</span>
-            </label>
-
-            <label className="flex items-center gap-1.5 cursor-pointer text-[11px] text-slate-300 hover:text-white">
-              <input
-                type="radio"
-                name="softStartInputMode"
-                value="capacitor"
-                checked={inputs.softStartInputMode === 'capacitor'}
-                onChange={() => onChange('softStartInputMode', 'capacitor')}
-                className="accent-cyan-500 cursor-pointer"
-              />
-              <span>По номиналу CSS (нФ)</span>
-            </label>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 gap-3">
+        {inputs.softStartInputMode === 'time' ? (
           <ManualNumericInput
-            label="Время старта Tss"
+            label="Время плавного пуска"
             unit="мс"
             value={inputs.tssMs}
-            min={0.1}
-            max={100}
-            colorScheme={inputs.softStartInputMode === 'time' ? 'cyan' : 'default'}
-            disabled={inputs.softStartInputMode === 'capacitor'}
-            hint={
-              inputs.softStartInputMode === 'time'
-                ? `Стандарт E24: ${results.cssNf.nominal} нФ`
-                : 'Рассчитано из CSS'
-            }
-            onChange={(val) => {
-              onChange('tssMs', val);
-              const syncedCss = Number(((val * 5) / 0.8).toFixed(2));
-              onChange('cssNf', syncedCss);
-            }}
+            colorScheme="cyan"
+            onChange={(val) => onChange('tssMs', val)}
+            hint={`Внутренний таймер чипа: ${results.minInternalTssMs} мс (Cref = ${results.crefNf.formatted})`}
           />
-
+        ) : (
           <ManualNumericInput
-            label="Конденсатор CSS"
+            label="Емкость конденсатора C_REF"
             unit="нФ"
-            value={inputs.cssNf}
-            min={0.1}
-            max={1000}
-            colorScheme={inputs.softStartInputMode === 'capacitor' ? 'cyan' : 'default'}
-            disabled={inputs.softStartInputMode === 'time'}
-            hint={
-              inputs.softStartInputMode === 'capacitor'
-                ? `Дает Tss = ${Number(((inputs.cssNf * 0.8) / 5).toFixed(2))} мс`
-                : `Стандарт E24: ${results.cssNf.nominal} нФ`
-            }
-            onChange={(valNf) => {
-              onChange('cssNf', valNf);
-              const calculatedTss = Number(((valNf * 0.8) / 5).toFixed(3));
-              onChange('tssMs', calculatedTss);
-            }}
+            value={inputs.crefNf}
+            colorScheme="cyan"
+            onChange={(val) => onChange('crefNf', val)}
+            hint="Cref от пина 8 к AGND (минимум 3.3 нФ для стабилизации)"
+          />
+        )}
+      </div>
+
+      {/* 5. Порог включения UVLO и разрешение (Пин 5 EN) */}
+      <div className="space-y-3 p-3.5 bg-slate-950/80 border border-slate-800 rounded-lg">
+        <div className="flex items-center justify-between">
+          <label className="text-xs font-semibold text-slate-200 tracking-wider uppercase flex items-center gap-1.5">
+            <Settings2 className="w-3.5 h-3.5 text-cyan-400" />
+            <span>EN (Пин 5) — Защита UVLO</span>
+          </label>
+          <span className="text-[11px] font-mono text-cyan-300 font-bold">
+            Start = {results.actualVinStart} В
+          </span>
+        </div>
+
+        <div className="p-2 bg-slate-900 border border-slate-800 rounded text-xs grid grid-cols-2 gap-2">
+          <label className="flex items-center gap-1.5 cursor-pointer text-[11px] text-slate-300 hover:text-white">
+            <input
+              type="radio"
+              name="uvloInputMode"
+              value="voltage"
+              checked={inputs.uvloInputMode === 'voltage'}
+              onChange={() => onChange('uvloInputMode', 'voltage')}
+              className="accent-cyan-500 cursor-pointer"
+            />
+            <span>По порогу Vin_start</span>
+          </label>
+          <label className="flex items-center gap-1.5 cursor-pointer text-[11px] text-slate-300 hover:text-white">
+            <input
+              type="radio"
+              name="uvloInputMode"
+              value="resistors"
+              checked={inputs.uvloInputMode === 'resistors'}
+              onChange={() => onChange('uvloInputMode', 'resistors')}
+              className="accent-cyan-500 cursor-pointer"
+            />
+            <span>Делитель Rup / Rdown</span>
+          </label>
+        </div>
+
+        {inputs.uvloInputMode === 'voltage' ? (
+          <ManualNumericInput
+            label="Порог включения Vin_start"
+            unit="В"
+            value={inputs.vinStartUvlo}
+            onChange={(val) => onChange('vinStartUvlo', val)}
+            hint="VIHEN = 1.22В (гистерезис 200 мВ)"
+          />
+        ) : (
+          <div className="grid grid-cols-2 gap-3">
+            <ManualNumericInput
+              label="Верхний R_UP"
+              unit="кОм"
+              value={inputs.rupKohm}
+              onChange={(val) => onChange('rupKohm', val)}
+            />
+            <ManualNumericInput
+              label="Нижний R_DOWN"
+              unit="кОм"
+              value={inputs.rdownKohm}
+              onChange={(val) => onChange('rdownKohm', val)}
+            />
+          </div>
+        )}
+
+        <div className="grid grid-cols-3 gap-1.5 text-[10px] p-2 bg-slate-900 rounded border border-slate-800 font-mono">
+          <div>
+            <span className="text-slate-400 block">Vin_start:</span>
+            <span className="text-cyan-300 font-bold">{results.actualVinStart}В</span>
+          </div>
+          <div>
+            <span className="text-slate-400 block">Vin_stop:</span>
+            <span className="text-slate-300 font-bold">{results.actualVinStop}В</span>
+          </div>
+          <div>
+            <span className="text-slate-400 block">VEN(VinMax):</span>
+            <span className={results.venOvervoltageWarning ? 'text-rose-400 font-bold' : 'text-emerald-400 font-bold'}>
+              {results.venAtVinMax}В {results.venOvervoltageWarning && '(!)'}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* 6. Feed-Forward конденсатор Cff (Пин 6 FB) */}
+      <div className="space-y-3 p-3.5 bg-slate-950/80 border border-slate-800 rounded-lg">
+        <div className="flex items-center justify-between">
+          <label className="text-xs font-semibold text-slate-200 tracking-wider uppercase flex items-center gap-1.5">
+            <Gauge className="w-3.5 h-3.5 text-purple-400" />
+            <span>C_FF (Параллельно R1) — Коррекция</span>
+          </label>
+          <span className="text-[11px] font-mono text-purple-300 font-bold">
+            {results.cff.formatted}
+          </span>
+        </div>
+
+        <div className="p-2 bg-slate-900 border border-slate-800 rounded text-xs grid grid-cols-2 gap-2">
+          <label className="flex items-center gap-1.5 cursor-pointer text-[11px] text-slate-300 hover:text-white">
+            <input
+              type="radio"
+              name="cffInputMode"
+              value="target_fz"
+              checked={inputs.cffInputMode === 'target_fz'}
+              onChange={() => onChange('cffInputMode', 'target_fz')}
+              className="accent-cyan-500 cursor-pointer"
+            />
+            <span>По частоте нуля fz</span>
+          </label>
+          <label className="flex items-center gap-1.5 cursor-pointer text-[11px] text-slate-300 hover:text-white">
+            <input
+              type="radio"
+              name="cffInputMode"
+              value="capacitor"
+              checked={inputs.cffInputMode === 'capacitor'}
+              onChange={() => onChange('cffInputMode', 'capacitor')}
+              className="accent-cyan-500 cursor-pointer"
+            />
+            <span>По емкости C_FF</span>
+          </label>
+        </div>
+
+        {inputs.cffInputMode === 'target_fz' ? (
+          <ManualNumericInput
+            label="Целевая частота нуля fz"
+            unit="кГц"
+            value={inputs.targetFzKhz}
+            colorScheme="purple"
+            onChange={(val) => onChange('targetFzKhz', val)}
+            hint="Рекомендация даташита MPS: 5 кГц .. 40 кГц (типично ~15 кГц)"
+          />
+        ) : (
+          <ManualNumericInput
+            label="Емкость конденсатора C_FF"
+            unit="пФ"
+            value={inputs.cffPf}
+            colorScheme="purple"
+            onChange={(val) => onChange('cffPf', val)}
+            hint="C0G / NP0 керамика параллельно верхнему резистору R1"
+          />
+        )}
+
+        <div className="flex items-center justify-between text-xs p-2 bg-slate-900 rounded font-mono">
+          <span className="text-slate-400">Фактический нуль контура:</span>
+          <span className="text-purple-300 font-bold">fz = {results.actualFzKhz} кГц</span>
+        </div>
+      </div>
+
+      {/* 7. Сервисные компоненты (BST, VCC, PGOOD) */}
+      <div className="space-y-3 p-3.5 bg-slate-950/80 border border-slate-800 rounded-lg text-xs">
+        <label className="text-xs font-semibold text-slate-200 tracking-wider uppercase flex items-center gap-1.5">
+          <Sliders className="w-3.5 h-3.5 text-slate-400" />
+          <span>Сервисная обвязка (BST, VCC, PGOOD)</span>
+        </label>
+        <div className="grid grid-cols-2 gap-2">
+          <ManualNumericInput
+            label="R_BST демпфер"
+            unit="Ω"
+            value={inputs.rbootOhm}
+            onChange={(val) => onChange('rbootOhm', val)}
+            hint="Гасит звон dV/dt (3.3 Ω реком.)"
+          />
+          <ManualNumericInput
+            label="C_BST бутстреп"
+            unit="нФ"
+            value={inputs.cbootNf}
+            onChange={(val) => onChange('cbootNf', val)}
+            hint="100 нФ ≥25В X7R"
           />
         </div>
-      </div>
-
-      {/* 10. Защита по входу (UVLO / EN Pin 3) */}
-      <div className="space-y-3 pt-3 border-t border-slate-800">
-        <div className="flex items-center justify-between">
-          <label className="text-xs font-semibold text-slate-400 tracking-wider uppercase block">
-            Защита по входу (UVLO / EN Пин 3)
-          </label>
-          <span className="text-[10px] font-mono text-cyan-400">
-            Ven_rise = 1.35В · Ven_fall = 1.20В
-          </span>
-        </div>
-
-        {/* Radio Button Selector: Mode of Definition */}
-        <div className="p-2 bg-slate-950/70 border border-slate-800 rounded-md space-y-1 text-xs">
-          <span className="text-[10px] uppercase font-mono text-slate-400 block mb-1">
-            Способ задания порога включения:
-          </span>
-          <div className="grid grid-cols-2 gap-2">
-            <label className="flex items-center gap-1.5 cursor-pointer text-[11px] text-slate-300 hover:text-white">
-              <input
-                type="radio"
-                name="uvloInputMode"
-                value="voltage"
-                checked={inputs.uvloInputMode === 'voltage'}
-                onChange={() => onChange('uvloInputMode', 'voltage')}
-                className="accent-cyan-500 cursor-pointer"
-              />
-              <span>По напряжению (В)</span>
-            </label>
-
-            <label className="flex items-center gap-1.5 cursor-pointer text-[11px] text-slate-300 hover:text-white">
-              <input
-                type="radio"
-                name="uvloInputMode"
-                value="resistors"
-                checked={inputs.uvloInputMode === 'resistors'}
-                onChange={() => onChange('uvloInputMode', 'resistors')}
-                className="accent-cyan-500 cursor-pointer"
-              />
-              <span>По двум резисторам (кОм)</span>
-            </label>
-          </div>
-        </div>
-
-        <ManualNumericInput
-          label="Порог включения Vin_start"
-          unit="В"
-          value={inputs.vinStartUvlo}
-          min={4.5}
-          colorScheme={inputs.uvloInputMode === 'voltage' ? 'cyan' : 'default'}
-          disabled={inputs.uvloInputMode === 'resistors'}
-          hint={
-            inputs.uvloInputMode === 'voltage'
-              ? `Стандарт E96: R_EN_H = ${results.renTopKohm.nominal} кОм`
-              : 'Рассчитано из R_EN_H и R_EN_L'
-          }
-          onChange={(val) => {
-            onChange('vinStartUvlo', val);
-            const ren2 = inputs.ren2Kohm > 0 ? inputs.ren2Kohm : 10.0;
-            const syncedRen1 = Number((ren2 * (val / 1.35 - 1)).toFixed(2));
-            onChange('ren1Kohm', syncedRen1);
-          }}
-        />
-
-        {/* Resistor Divider REN1 (R_EN_H) & REN2 (R_EN_L) */}
-        <div className={`p-2.5 rounded-lg border transition-colors space-y-2 ${
-          inputs.uvloInputMode === 'resistors'
-            ? 'bg-cyan-950/30 border-cyan-700/80'
-            : 'bg-slate-950/60 border-slate-800'
-        }`}>
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] uppercase font-mono text-slate-400">
-              Делитель на выводе EN (Пин 3):
-            </span>
-            {inputs.uvloInputMode === 'resistors' && (
-              <span className="text-[10px] font-mono text-cyan-300 font-semibold px-1.5 py-0.5 rounded bg-cyan-900/60">
-                Ручной ввод обоих резисторов
-              </span>
-            )}
-          </div>
-
-          <div className="grid grid-cols-2 gap-2">
-            <ManualNumericInput
-              label="Верхний R_EN_H"
-              unit="кОм"
-              value={inputs.ren1Kohm}
-              colorScheme={inputs.uvloInputMode === 'resistors' ? 'cyan' : 'default'}
-              disabled={inputs.uvloInputMode === 'voltage'}
-              hint={
-                inputs.uvloInputMode === 'resistors'
-                  ? `Задано вручную: ${inputs.ren1Kohm} кОм`
-                  : `E96: ${results.renTopKohm.nominal} кОм`
-              }
-              onChange={(newRen1) => {
-                onChange('ren1Kohm', newRen1);
-                const ren2 = inputs.ren2Kohm > 0 ? inputs.ren2Kohm : 10.0;
-                const newVinStart = Number((1.35 * (1 + newRen1 / ren2)).toFixed(2));
-                onChange('vinStartUvlo', newVinStart);
-              }}
-            />
-
-            <ManualNumericInput
-              label="Нижний R_EN_L"
-              unit="кОм"
-              value={inputs.ren2Kohm}
-              colorScheme={inputs.uvloInputMode === 'resistors' ? 'cyan' : 'default'}
-			  disabled={inputs.uvloInputMode === 'voltage'}
-              hint={
-                inputs.uvloInputMode === 'resistors'
-                  ? `Задано вручную: ${inputs.ren2Kohm} кОм`
-                  : 'Базовый резистор (обычно 10 кОм)'
-              }
-              onChange={(newRen2) => {
-                onChange('ren2Kohm', newRen2);
-                if (newRen2 > 0) {
-                  if (inputs.uvloInputMode === 'resistors') {
-                    const newVinStart = Number((1.35 * (1 + inputs.ren1Kohm / newRen2)).toFixed(2));
-                    onChange('vinStartUvlo', newVinStart);
-                  } else {
-                    const syncedRen1 = Number((newRen2 * (inputs.vinStartUvlo / 1.35 - 1)).toFixed(2));
-                    onChange('ren1Kohm', syncedRen1);
-                  }
-                }
-              }}
-            />
-          </div>
-        </div>
-
-        <div className="p-2.5 bg-slate-950/70 border border-slate-800 rounded-lg text-xs space-y-1.5 font-mono">
-          <div className="flex items-center justify-between text-slate-400">
-			  <span>Порог включения Vin_start (Ven=1.35В):</span>
-			  <span className="text-slate-200 font-bold">{results.actualVinStart} В</span>
-		  </div>
-		  <div className="flex items-center justify-between text-slate-400">
-			  <span>Порог отключения Vin_stop (Ven=1.20В):</span>
-			  <span className="text-slate-200 font-bold">{results.actualVinStop} В</span>
-		  </div>
-          <div className="flex items-center justify-between text-slate-400">
-            <span>Физический гистерезис:</span>
-            <span className="text-emerald-400 font-bold">
-              {(results.actualVinStart - results.actualVinStop).toFixed(2)} В
-            </span>
-          </div>
-          <div className="flex items-center justify-between text-slate-400">
-            <span>Ток делителя при старте:</span>
-            <span className="text-cyan-400 font-bold">
-              {((results.actualVinStart / (inputs.ren1Kohm + inputs.ren2Kohm)) * 1000).toFixed(0)} мкА
-            </span>
-          </div>
-        </div>
-      </div>
-
-      {/* 11. Токовый предел ILIMIT (Пин 25) */}
-      <div className="p-3 bg-slate-950/70 border border-slate-800 rounded-lg space-y-1.5 font-mono text-xs">
-        <div className="flex items-center justify-between text-slate-400">
-          <span>Токовый порог ILIMIT (Пин 25):</span>
-          <span className="text-amber-400 font-bold">{results.rlimKohm.formatted}</span>
-        </div>
-        <p className="text-[10px] text-slate-400 font-sans leading-tight">
-          Формула Vishay: Rlim = Klim / Ivalley ({results.klimValue}k / {results.iValley}A). Порог нижнего ключа Ivalley ≈ {results.ilimNominalA} A (средний ток отсечки Iocp ≈ {(results.ilimNominalA + results.actualDeltaIL / 2).toFixed(1)} A).
-        </p>
-      </div>
-
-      {/* Quick Summary Badge */}
-      <div className="p-3 bg-slate-950 rounded-lg border border-slate-800/80 space-y-1.5 text-xs font-mono">
-        <div className="flex items-center justify-between text-slate-400">
-          <span>Duty Cycle (ном):</span>
-          <span className="text-slate-200 font-bold">
-            {(results.dutyNom * 100).toFixed(1)} %
-          </span>
-        </div>
-        <div className="flex items-center justify-between text-slate-400">
-          <span>Время t_on (мин):</span>
-          <span
-            className={
-              results.tonMinWarning
-                ? 'text-rose-400 font-bold'
-                : 'text-emerald-400 font-medium'
-            }
-          >
-            {results.tonNs} нс
-          </span>
-        </div>
-        <div className="flex items-center justify-between text-slate-400">
-          <span>Оценка КПД:</span>
-          <span className="text-cyan-400 font-bold">
-            ~ {results.estimatedEfficiency} %
-          </span>
+        <div className="grid grid-cols-2 gap-2">
+          <ManualNumericInput
+            label="C_VCC конденсатор"
+            unit="µF"
+            value={inputs.cvccUf}
+            onChange={(val) => onChange('cvccUf', val)}
+            hint="Мин. 1 µF к AGND/PGND"
+          />
+          <ManualNumericInput
+            label="R_PGOOD подтяжка"
+            unit="кОм"
+            value={inputs.rpgoodKohm}
+            onChange={(val) => onChange('rpgoodKohm', val)}
+            hint="10 кОм к VCC / 3.3В"
+          />
         </div>
       </div>
     </div>

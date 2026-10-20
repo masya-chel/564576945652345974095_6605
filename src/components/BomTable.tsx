@@ -9,14 +9,14 @@ interface BomTableProps {
 
 export const BomTable: React.FC<BomTableProps> = ({
   bomItems,
-  projectName = 'SiC461_Design',
+  projectName = 'MPQ8626_Design',
 }) => {
   const [copied, setCopied] = useState(false);
 
   const exportCsv = () => {
     const headers = [
       'Позиция (Designator)',
-      'Вывод / Пин SiC46x',
+      'Вывод / Пин QFN-14',
       'Наименование / Описание',
       'Категория',
       'Номинал (Стандарт E24/E96)',
@@ -77,7 +77,7 @@ export const BomTable: React.FC<BomTableProps> = ({
             </h2>
           </div>
           <p className="text-xs text-slate-400 mt-1">
-            Полный перечень элементов обвязки SiC461 по выводам с рекомендованными рядами E24/E96 и запасами по напряжению/току
+            Полный перечень элементов обвязки MPQ8626GD / IS6605A по выводам с рекомендованными рядами E24/E96 и запасами по напряжению/току
           </p>
         </div>
 
@@ -117,7 +117,7 @@ export const BomTable: React.FC<BomTableProps> = ({
           <thead>
             <tr className="bg-slate-950/80 border-b border-slate-800 text-slate-400 font-mono text-[11px] uppercase tracking-wider">
               <th className="p-3 whitespace-nowrap">Позиция</th>
-              <th className="p-3 whitespace-nowrap">Вывод / Пин</th>
+              <th className="p-3 whitespace-nowrap">Вывод QFN-14</th>
               <th className="p-3 whitespace-nowrap">Номинал (E24/E96)</th>
               <th className="p-3 whitespace-nowrap">Расчетное</th>
               <th className="p-3 whitespace-nowrap">Точность</th>

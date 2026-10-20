@@ -1,6 +1,6 @@
 import React, { useState, useRef, useMemo } from 'react';
 import { CalculatorInputs, PresetProfile } from './types/calculator';
-import { calculateSiC461, generateBomList } from './utils/sic461Math';
+import { calculateMPQ8626, generateBomList } from './utils/mpq8626Math';
 import { PRESET_PROFILES } from './utils/presets';
 import { Header } from './components/Header';
 import { InputPanel } from './components/InputPanel';
@@ -8,7 +8,7 @@ import { SchematicView } from './components/SchematicView';
 import { BomTable } from './components/BomTable';
 import { WaveformChart } from './components/WaveformChart';
 import { PythonExportModal } from './components/PythonExportModal';
-import { CheckCircle2, AlertCircle, Sparkles } from 'lucide-react';
+import { CheckCircle2, AlertCircle } from 'lucide-react';
 
 export default function App() {
   const [inputs, setInputs] = useState<CalculatorInputs>(
@@ -26,7 +26,7 @@ export default function App() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Instant real-time calculation
-  const results = useMemo(() => calculateSiC461(inputs), [inputs]);
+  const results = useMemo(() => calculateMPQ8626(inputs), [inputs]);
   const bomItems = useMemo(
     () => generateBomList(inputs, results),
     [inputs, results]
@@ -56,76 +56,53 @@ export default function App() {
   const handleResetDefaults = () => {
     setInputs(PRESET_PROFILES[0].inputs);
     setSelectedPresetId(PRESET_PROFILES[0].id);
-    showToast('Сброшено к заводскому профилю 24В → 5В @ 10А');
+    showToast('Сброшено к заводскому профилю 12В → 1.8В @ 6А (MPQ8626)');
   };
 
   // Export current design to JSON file
   const handleExportJson = () => {
     const exportData = {
-      device: `Vishay ${inputs.chipModel || 'SiC461'} Synchronous Buck Regulator`,
-      version: '2.0',
+      device: `MPS ${inputs.chipModel || 'MPQ8626GD'} / IS6605A Synchronous Buck Regulator`,
+      package: 'QFN-14 (2mm x 3mm)',
+      version: '2.5',
       timestamp: new Date().toISOString(),
       inputModes: {
-        voutInputMode: inputs.voutInputMode, // 'voltage' | 'resistors'
-        softStartInputMode: inputs.softStartInputMode, // 'time' | 'capacitor'
-        uvloInputMode: inputs.uvloInputMode, // 'voltage' | 'resistors'
-        fswInputMode: inputs.fswInputMode, // 'frequency' | 'resistor'
-        modeInputMode: inputs.modeInputMode, // 'mode' | 'resistor'
-        compInputMode: inputs.compInputMode, // 'auto' | 'manual'
-        vsnsInputMode: inputs.vsnsInputMode, // 'auto' | 'manual'
-        bootInputMode: inputs.bootInputMode, // 'standard' | 'custom'
-      },
-      inputComponents: {
-        rfb1Kohm: inputs.rfb1Kohm,
-        rfb2Kohm: inputs.rfb2Kohm,
-        cssNf: inputs.cssNf,
-        ren1Kohm: inputs.ren1Kohm,
-        ren2Kohm: inputs.ren2Kohm,
-        rfswKohm: inputs.rfswKohm,
-        rmodeKohm: inputs.rmodeKohm,
-        rcompKohm: inputs.rcompKohm,
-        ccompPf: inputs.ccompPf,
-        rxKohm: inputs.rxKohm,
-        cxNf: inputs.cxNf,
-        cyNf: inputs.cyNf,
-        rbootOhm: inputs.rbootOhm,
-        cbootNf: inputs.cbootNf,
-        cvdrvUf: inputs.cvdrvUf,
+        voutInputMode: inputs.voutInputMode,
+        softStartInputMode: inputs.softStartInputMode,
+        uvloInputMode: inputs.uvloInputMode,
+        currentLimitInputMode: inputs.currentLimitInputMode,
+        modeInputMode: inputs.modeInputMode,
+        cffInputMode: inputs.cffInputMode,
+        bootInputMode: inputs.bootInputMode,
       },
       inputs,
       pinConfigurations: {
-        pin1_VCIN: { cvcinUf: inputs.cvcinUf, rvcinOhm: inputs.rvcinOhm },
-        pin2_PGOOD: { rpgoodKohm: inputs.rpgoodKohm },
-        pin3_EN: { ren1Kohm: inputs.ren1Kohm, ren2Kohm: inputs.ren2Kohm, vinStart: results.actualVinStart, vinStop: results.actualVinStop },
-        pin4_BOOT: { cbootNf: results.cbootNf.nominal, rbootOhm: results.rbootOhm.nominal },
-        pins5_6_PHASE: { connectedTo: 'BOOT damper loop and SW' },
-        pins7_10_SW: { inductorNominalUh: results.lNominal.nominal, deltaIL: results.actualDeltaIL },
-        pins11_15_PGND: { groundReturn: 'Power Ground plane' },
-        pin16_VDRV: { cvdrvUf: results.cvdrvUf.nominal, supplySource: results.vdrvSupplySource },
-        pins17_23_AGND: { groundReturn: 'Analog Quiet Ground' },
-        pin18_ULTRASONIC: { enabled: inputs.ultrasonicEnabled, connection: inputs.ultrasonicEnabled ? '0Ω to VDD' : 'Floating' },
-        pin19_SS: { cssNf: results.cssNf.nominal, actualTssMs: results.actualTssMs },
-        pin20_VSNS: { rxKohm: results.rxKohm.nominal, cxNf: results.cxNf.nominal, cyNf: results.cyNf.nominal, vrampMv: results.vrampMv },
-        pin21_COMP: { rcompKohm: results.rcompKohm.nominal, ccompPf: results.ccompPf.nominal, crossoverFreqKhz: results.crossoverFreqKhz },
-        pin22_VFB: { rfbTopKohm: results.rfbTop.nominal, rfbBottomKohm: results.rfbBottom.nominal, voutActual: results.voutActual },
-        pin24_FSW: { rfswKohm: results.rfswKohm.nominal, actualFswKhz: results.actualFswKhz },
-        pin25_ILIMIT: { rlimKohm: results.rlimKohm.nominal, ilimNominalA: results.ilimNominalA },
-        pin26_VDD: { cvddUf: results.cddUf.nominal },
-        pin27_MODE: { rmodeKohm: results.rmodeKohm.nominal, operatingMode: results.detectedMode, description: results.modeDescription },
+        pins1_14_PGND: { groundReturn: 'Power Ground plane' },
+        pins2_11_SW: { inductorNominalUh: results.lNominal.nominal, deltaIL: results.actualDeltaIL, iPeak: results.iPeak },
+        pin3_VIN: { cinUf: results.cinQty * results.cinSingleUf, cinRmsA: results.cinRmsA },
+        pin4_CS: { rcsKohm: results.rcsKohm.nominal, ilimValleyA: results.actualIlimValleyA, ilimDcA: results.actualIlimDcA },
+        pin5_EN: { rupKohm: results.rupKohm.nominal, rdownKohm: results.rdownKohm.nominal, vinStart: results.actualVinStart, vinStop: results.actualVinStop },
+        pin6_FB: { r1TopKohm: results.r1Top.nominal, r2BottomKohm: results.r2Bottom.nominal, cffPf: results.cff.nominal, fzKhz: results.actualFzKhz, voutActual: results.voutActual },
+        pin7_AGND: { groundReturn: 'Analog Quiet Ground' },
+        pin8_TRK_REF: { crefNf: results.crefNf.nominal, actualTssMs: results.actualTssMs },
+        pin9_PGOOD: { rpgoodKohm: results.rpgoodKohm.nominal, rpgFilterOhm: results.rpgFilterOhm.nominal, cpgFilterNf: results.cpgFilterNf.nominal },
+        pin10_BST: { cbootNf: results.cbootNf.nominal, rbootOhm: results.rbootOhm.nominal },
+        pin12_MODE: { pinConnection: results.modePinConnection, fswKhz: results.actualFswKhz, lightLoadMode: results.detectedLightLoadMode, description: results.modeDescription },
+        pin13_VCC: { cvccUf: results.cvccUf.nominal, vccVoltageV: results.vccVoltageV },
       },
       calculatedSummary: {
         dutyNominal: results.dutyNom,
+        tonNs: results.tonNs,
         inductorNominalUh: results.lNominal.nominal,
         coutTotalUf: results.coutQty * results.coutSingleUf,
         cinTotalUf: results.cinQty * results.cinSingleUf,
-        rfbTopKohm: results.rfbTop.nominal,
-        rfbBottomKohm: results.rfbBottom.nominal,
         actualVout: results.voutActual,
         actualRippleMv: results.actualRippleMv,
         actualTssMs: results.actualTssMs,
         actualVinStart: results.actualVinStart,
         actualVinStop: results.actualVinStop,
         estimatedEfficiency: results.estimatedEfficiency,
+        estimatedPowerLossW: results.estimatedPowerLossW,
       },
     };
 
@@ -134,10 +111,10 @@ export default function App() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `sic461_${inputs.vout}v_${inputs.ioutMax}a_config.json`;
+    link.download = `mpq8626_${inputs.vout}v_${inputs.ioutMax}a_config.json`;
     link.click();
     URL.revokeObjectURL(url);
-    showToast('Параметры всех пинов и режимы успешно выгружены в JSON файл');
+    showToast('Параметры всех 14 пинов и режимы успешно выгружены в JSON');
   };
 
   // Trigger file open dialog
@@ -161,112 +138,77 @@ export default function App() {
         const inputModes = parsed.inputModes || {};
         const inputComponents = parsed.inputComponents || {};
 
-        // Extract modes and components
-        const voutMode =
-          importedInputs.voutInputMode || inputModes.voutInputMode || 'voltage';
-        const ssMode =
-          importedInputs.softStartInputMode || inputModes.softStartInputMode || 'time';
-        const uvloMode =
-          importedInputs.uvloInputMode || inputModes.uvloInputMode || 'voltage';
-        const fswMode =
-          importedInputs.fswInputMode || inputModes.fswInputMode || 'frequency';
-        const modeMode =
-          importedInputs.modeInputMode || inputModes.modeInputMode || 'mode';
-        const compMode =
-          importedInputs.compInputMode || inputModes.compInputMode || 'auto';
-        const vsnsMode =
-          importedInputs.vsnsInputMode || inputModes.vsnsInputMode || 'auto';
-        const bootMode =
-          importedInputs.bootInputMode || inputModes.bootInputMode || 'standard';
+        const voutMode = importedInputs.voutInputMode || inputModes.voutInputMode || 'voltage';
+        const ssMode = importedInputs.softStartInputMode || inputModes.softStartInputMode || 'time';
+        const uvloMode = importedInputs.uvloInputMode || inputModes.uvloInputMode || 'voltage';
+        const curMode = importedInputs.currentLimitInputMode || inputModes.currentLimitInputMode || 'current';
+        const modeMode = importedInputs.modeInputMode || inputModes.modeInputMode || 'mode_fsw';
+        const cffMode = importedInputs.cffInputMode || inputModes.cffInputMode || 'target_fz';
+        const bootMode = importedInputs.bootInputMode || inputModes.bootInputMode || 'standard';
 
-        let rfb1 = Number(importedInputs.rfb1Kohm ?? inputComponents.rfb1Kohm ?? 52.5);
-        let rfb2 = Number(importedInputs.rfb2Kohm ?? inputComponents.rfb2Kohm ?? 10.0);
-        let vout = Number(importedInputs.vout ?? 5.0);
+        let r1 = Number(importedInputs.r1Kohm ?? inputComponents.r1Kohm ?? importedInputs.rfb1Kohm ?? 4.02);
+        let r2 = Number(importedInputs.r2Kohm ?? inputComponents.r2Kohm ?? importedInputs.rfb2Kohm ?? 2.0);
+        let vout = Number(importedInputs.vout ?? 1.8);
         if (voutMode === 'resistors') {
-          vout = Number((0.800 * (1 + rfb1 / rfb2)).toFixed(3));
-        } else {
-          rfb1 = Number((rfb2 * (vout / 0.800 - 1)).toFixed(2));
+          vout = Number((0.600 * (1 + r1 / r2)).toFixed(3));
         }
 
-        let css = Number(importedInputs.cssNf ?? inputComponents.cssNf ?? 31.25);
-        let tss = Number(importedInputs.tssMs ?? 5.0);
-        if (ssMode === 'capacitor') {
-          tss = Number(((css * 0.8) / 5).toFixed(3));
-        } else {
-          css = Number(((tss * 5) / 0.8).toFixed(2));
-        }
+        let cref = Number(importedInputs.crefNf ?? inputComponents.crefNf ?? importedInputs.cssNf ?? 3.3);
+        let tss = Number(importedInputs.tssMs ?? 2.2);
 
-        let ren1 = Number(importedInputs.ren1Kohm ?? inputComponents.ren1Kohm ?? 127.5);
-        let ren2 = Number(importedInputs.ren2Kohm ?? inputComponents.ren2Kohm ?? 10.0);
-        let vinStart = Number(importedInputs.vinStartUvlo ?? 16.5);
+        let rup = Number(importedInputs.rupKohm ?? inputComponents.rupKohm ?? importedInputs.ren1Kohm ?? 71.5);
+        let rdown = Number(importedInputs.rdownKohm ?? inputComponents.rdownKohm ?? importedInputs.ren2Kohm ?? 10.0);
+        let vinStart = Number(importedInputs.vinStartUvlo ?? 10.0);
         if (uvloMode === 'resistors') {
-          vinStart = Number((1.20 * (1 + ren1 / ren2)).toFixed(2));
-        } else {
-          ren1 = Number((ren2 * (vinStart / 1.20 - 1)).toFixed(2));
+          vinStart = Number((1.22 * (1 + rup / rdown)).toFixed(2));
         }
 
-        let fswKhz = Number(importedInputs.fswKhz ?? 500);
-        let rfsw = Number(importedInputs.rfswKohm ?? inputComponents.rfswKohm ?? 52.6);
-        if (fswMode === 'resistor') {
-          fswKhz = Number((vout / (1.9e-10 * (rfsw * 1000) * 1000)).toFixed(1));
-        } else {
-          rfsw = Number((vout / (1.9e-10 * (fswKhz * 1000) * 1000)).toFixed(2));
-        }
-
-        let opMode = Number(importedInputs.operatingMode ?? 1);
-        let rmode = Number(importedInputs.rmodeKohm ?? inputComponents.rmodeKohm ?? 2.0);
-        if (modeMode === 'resistor') {
-          if (rmode <= 10) opMode = 1;
-          else if (rmode <= 400) opMode = 2;
-          else if (rmode <= 750) opMode = 3;
-          else opMode = 4;
+        let chipModel = importedInputs.chipModel;
+        if (!chipModel || chipModel.startsWith('SiC')) {
+          chipModel = 'MPQ8626GD';
         }
 
         setInputs({
-          chipModel: importedInputs.chipModel ?? 'SiC461',
-          operatingMode: opMode as any,
-          ultrasonicEnabled: Boolean(importedInputs.ultrasonicEnabled ?? true),
-          vinNom: Number(importedInputs.vinNom ?? 24),
-          vinMin: Number(importedInputs.vinMin ?? 18),
-          vinMax: Number(importedInputs.vinMax ?? 32),
+          chipModel: chipModel as any,
+          vccBiasMode: importedInputs.vccBiasMode ?? 'internal',
+          lightLoadMode: importedInputs.lightLoadMode ?? 'FCCM',
+          fswKhz: Number(importedInputs.fswKhz ?? 1100) as any,
+          vinNom: Number(importedInputs.vinNom ?? 12),
+          vinMin: Number(importedInputs.vinMin ?? 10.8),
+          vinMax: Number(importedInputs.vinMax ?? 13.2),
           vout,
-          ioutMax: Number(importedInputs.ioutMax ?? 10),
-          fswKhz,
-          kind: Number(importedInputs.kind ?? 0.3),
-          voutRippleMaxMv: Number(importedInputs.voutRippleMaxMv ?? 30),
-          loadStepA: Number(importedInputs.loadStepA ?? 5),
-          voltageOvershootMv: Number(importedInputs.voltageOvershootMv ?? 150),
+          ioutMax: Number(importedInputs.ioutMax ?? 6),
+          kind: Number(importedInputs.kind ?? 0.35),
+          voutRippleMaxMv: Number(importedInputs.voutRippleMaxMv ?? 15),
+          loadStepA: Number(importedInputs.loadStepA ?? 3),
+          voltageOvershootMv: Number(importedInputs.voltageOvershootMv ?? 50),
           tssMs: tss,
           vinStartUvlo: vinStart,
-          vinStopUvlo: Number((1.10 * (1 + ren1 / ren2)).toFixed(2)),
+          vinStopUvlo: Number((1.02 * (1 + rup / rdown)).toFixed(2)),
+          ilimTargetA: Number(importedInputs.ilimTargetA ?? 6.0),
+          targetFzKhz: Number(importedInputs.targetFzKhz ?? 15.0),
           voutInputMode: voutMode,
           softStartInputMode: ssMode,
           uvloInputMode: uvloMode,
-          fswInputMode: fswMode,
+          currentLimitInputMode: curMode,
           modeInputMode: modeMode,
-          compInputMode: compMode,
-          vsnsInputMode: vsnsMode,
+          cffInputMode: cffMode,
           bootInputMode: bootMode,
-          rfb1Kohm: rfb1,
-          rfb2Kohm: rfb2,
-          cssNf: css,
-          ren1Kohm: ren1,
-          ren2Kohm: ren2,
-          rfswKohm: rfsw,
-          rmodeKohm: rmode,
-          rcompKohm: Number(importedInputs.rcompKohm ?? inputComponents.rcompKohm ?? 13.7),
-          ccompPf: Number(importedInputs.ccompPf ?? inputComponents.ccompPf ?? 1200),
-          rxKohm: Number(importedInputs.rxKohm ?? inputComponents.rxKohm ?? 51.1),
-          cxNf: Number(importedInputs.cxNf ?? inputComponents.cxNf ?? 2.2),
-          cyNf: Number(importedInputs.cyNf ?? inputComponents.cyNf ?? 2.7),
+          r1Kohm: r1,
+          r2Kohm: r2,
+          cffPf: Number(importedInputs.cffPf ?? inputComponents.cffPf ?? 2700),
+          crefNf: cref,
+          rupKohm: rup,
+          rdownKohm: rdown,
+          rcsKohm: Number(importedInputs.rcsKohm ?? inputComponents.rcsKohm ?? 4.87),
+          rmodeKohm: Number(importedInputs.rmodeKohm ?? inputComponents.rmodeKohm ?? 0),
           rbootOhm: Number(importedInputs.rbootOhm ?? inputComponents.rbootOhm ?? 3.3),
           cbootNf: Number(importedInputs.cbootNf ?? inputComponents.cbootNf ?? 100),
-          cvdrvUf: Number(importedInputs.cvdrvUf ?? inputComponents.cvdrvUf ?? 4.7),
-          vdrvExtVoltage: Number(importedInputs.vdrvExtVoltage ?? 5.0),
-          rvcinOhm: Number(importedInputs.rvcinOhm ?? 0),
-          cvcinUf: Number(importedInputs.cvcinUf ?? 0.1),
-          cvddUf: Number(importedInputs.cvddUf ?? 1.0),
-          rpgoodKohm: Number(importedInputs.rpgoodKohm ?? 102),
+          cvccUf: Number(importedInputs.cvccUf ?? inputComponents.cvccUf ?? 1.0),
+          rpgoodKohm: Number(importedInputs.rpgoodKohm ?? inputComponents.rpgoodKohm ?? 10.0),
+          rpgFilterOhm: Number(importedInputs.rpgFilterOhm ?? 20.0),
+          cpgFilterNf: Number(importedInputs.cpgFilterNf ?? 1.0),
+          colNf: Number(importedInputs.colNf ?? 10.0),
         });
         setSelectedPresetId('custom');
         showToast(`Параметры и режимы успешно загружены из "${file.name}"`);
@@ -338,7 +280,7 @@ export default function App() {
         {activeTab === 'bom' && (
           <BomTable
             bomItems={bomItems}
-            projectName={`SiC461_${inputs.vout}V_${inputs.ioutMax}A`}
+            projectName={`${inputs.chipModel || 'MPQ8626'}_${inputs.vout}V_${inputs.ioutMax}A`}
           />
         )}
         {activeTab === 'analysis' && (

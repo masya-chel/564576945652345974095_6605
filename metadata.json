@@ -1,6 +1,6 @@
 {
-  "name": "SiC461 DC-DC Component Calculator",
-  "description": "Инженерный калькулятор компонентов синхронного понижающего DC-DC преобразователя Vishay SiC461 с подбором рядов E24/E96, интерактивной схемой и экспортом в JSON/Python.",
+  "name": "MPQ8626GD / IS6605A DC-DC Buck Calculator",
+  "description": "Инженерный калькулятор компонентов синхронного понижающего преобразователя MPS MPQ8626GD и IS6605A (16V, 6A, QFN-14) с расчетом дросселя, MLCC конденсаторов, токового предела, делителя FB, софт-старта, подбором рядов E24/E96, интерактивной схемой и экспортом в JSON/Python.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

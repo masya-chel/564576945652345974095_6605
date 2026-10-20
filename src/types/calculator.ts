@@ -1,59 +1,63 @@
 export type VoutInputMode = 'voltage' | 'resistors';
 export type SoftStartInputMode = 'time' | 'capacitor';
 export type UvloInputMode = 'voltage' | 'resistors';
-export type FswInputMode = 'frequency' | 'resistor';
-export type ModeInputMode = 'mode' | 'resistor';
-export type CompInputMode = 'auto' | 'manual';
-export type VsnsInputMode = 'auto' | 'manual';
+export type CurrentLimitInputMode = 'current' | 'resistor';
+export type ModeInputMode = 'mode_fsw' | 'resistor';
+export type CffInputMode = 'target_fz' | 'capacitor';
 export type BootInputMode = 'standard' | 'custom';
-export type ChipModel = 'SiC461' | 'SiC462' | 'SiC463' | 'SiC464';
-export type OperatingMode = 1 | 2 | 3 | 4;
+
+export type ChipModel = 'MPQ8626GD' | 'IS6605A';
+export type LightLoadMode = 'FCCM' | 'PulseSkip';
+export type SwitchingFreqOption = 600 | 1100 | 2000;
+export type VccBiasMode = 'internal' | 'external_3v3';
 
 export interface CalculatorInputs {
   chipModel: ChipModel;
-  operatingMode: OperatingMode;
-  ultrasonicEnabled: boolean;
+  vccBiasMode: VccBiasMode;
+  lightLoadMode: LightLoadMode;
+  fswKhz: SwitchingFreqOption;
+  
+  // Power Stage Specs
   vinNom: number;
   vinMin: number;
   vinMax: number;
   vout: number;
   ioutMax: number;
-  fswKhz: number;
-  kind: number;
+  kind: number; // Target ripple ratio (typ 0.25 - 0.40)
   voutRippleMaxMv: number;
   loadStepA: number;
   voltageOvershootMv: number;
   tssMs: number;
   vinStartUvlo: number;
   vinStopUvlo?: number;
+  ilimTargetA: number;
+  targetFzKhz: number;
+
+  // Input Modes
   voutInputMode: VoutInputMode;
   softStartInputMode: SoftStartInputMode;
   uvloInputMode: UvloInputMode;
-  fswInputMode: FswInputMode;
+  currentLimitInputMode: CurrentLimitInputMode;
   modeInputMode: ModeInputMode;
-  compInputMode: CompInputMode;
-  vsnsInputMode: VsnsInputMode;
+  cffInputMode: CffInputMode;
   bootInputMode: BootInputMode;
-  rfb1Kohm: number;
-  rfb2Kohm: number;
-  cssNf: number;
-  ren1Kohm: number;
-  ren2Kohm: number;
-  rfswKohm: number;
-  rmodeKohm: number;
-  rcompKohm: number;
-  ccompPf: number;
-  rxKohm: number;
-  cxNf: number;
-  cyNf: number;
-  rbootOhm: number;
-  cbootNf: number;
-  cvdrvUf: number;
-  vdrvExtVoltage: number;
-  rvcinOhm: number;
-  cvcinUf: number;
-  cvddUf: number;
-  rpgoodKohm: number;
+
+  // Manual component overrides
+  r1Kohm: number;        // Top feedback resistor (VOUT to FB)
+  r2Kohm: number;        // Bottom feedback resistor (FB to AGND)
+  cffPf: number;         // Feed-forward cap across R1
+  crefNf: number;        // Soft-start capacitor on TRK/REF
+  rupKohm: number;       // EN upper divider resistor from VIN
+  rdownKohm: number;     // EN lower divider resistor to AGND
+  rcsKohm: number;       // Current limit resistor on CS pin
+  rmodeKohm: number;     // Resistor on MODE pin to AGND
+  rbootOhm: number;      // Damping resistor in series with Cboot
+  cbootNf: number;       // Bootstrap capacitor
+  cvccUf: number;        // VCC decoupling capacitor
+  rpgoodKohm: number;    // PGOOD pull-up resistor
+  rpgFilterOhm: number;  // PGOOD filter resistor (layout guideline)
+  cpgFilterNf: number;   // PGOOD filter capacitor (layout guideline)
+  colNf: number;         // High-frequency output filter cap COL
 }
 
 export interface StandardComponent {
@@ -78,6 +82,8 @@ export interface CalculatorResults {
   toffNs: number;
   tonMinWarning: boolean;
   toffMinWarning: boolean;
+  
+  // Inductor
   deltaIL: number;
   lCalcUh: number;
   lNominal: StandardComponent;
@@ -86,63 +92,78 @@ export interface CalculatorResults {
   iPeak: number;
   iValley: number;
   iRms: number;
+
+  // Output Capacitors
   coutRippleMinUf: number;
   coutTransientMinUf: number;
+  coutStabilityMinUf: number;
   coutEffectiveMinUf: number;
   coutRecommendedUf: StandardComponent;
   coutQty: number;
   coutSingleUf: number;
   actualRippleMv: number;
+
+  // Input Capacitors
   cinRmsA: number;
   cinMinUf: number;
   cinRecommendedUf: StandardComponent;
   cinQty: number;
   cinSingleUf: number;
+
+  // Feedback Network & Cff
   vref: number;
-  rfbBottom: StandardComponent;
-  rfbTop: StandardComponent;
+  r1Top: StandardComponent;
+  r2Bottom: StandardComponent;
+  cff: StandardComponent;
+  actualFzKhz: number;
   voutActual: number;
   voutErrorPercent: number;
-  rfswKohm: StandardComponent;
-  actualFswKhz: number;
-  rmodeKohm: StandardComponent;
+
+  // Mode & Frequency
+  modeResistor: StandardComponent;
+  modePinConnection: string;
   modeDescription: string;
-  detectedMode: OperatingMode;
-  rxKohm: StandardComponent;
-  cxNf: StandardComponent;
-  cyNf: StandardComponent;
-  vrampMv: number;
-  vrampMinMv: number;
-  vrampMaxMv: number; // <-- ДОБАВЛЕНО
-  vrampWarning: boolean;
-  rcompKohm: StandardComponent;
-  ccompPf: StandardComponent;
-  crossoverFreqKhz: number;
-  lcPoleFreqKhz: number;
-  cssNf: StandardComponent;
+  detectedLightLoadMode: LightLoadMode;
+  actualFswKhz: number;
+
+  // Current Limit (CS Pin)
+  rcsKohm: StandardComponent;
+  ilimTargetA: number;
+  actualIlimValleyA: number;
+  actualIlimDcA: number;
+
+  // Soft Start (TRK/REF Pin)
+  crefNf: StandardComponent;
   actualTssMs: number;
-  klimValue: number;
-  rlimKohm: StandardComponent;
-  ilimNominalA: number;
-  renTopKohm: StandardComponent;
-  renBottomKohm: StandardComponent;
+  minInternalTssMs: number;
+
+  // UVLO / EN Pin
+  rupKohm: StandardComponent;
+  rdownKohm: StandardComponent;
   actualVinStart: number;
   actualVinStop: number;
+  venAtVinMax: number;
+  venOvervoltageWarning: boolean;
+
+  // Bootstrap & Ancillary Passives
   cbootNf: StandardComponent;
   rbootOhm: StandardComponent;
-  cvdrvUf: StandardComponent;
-  vdrvSupplySource: string;
-  vdrvPowerLossW: number;
-  cvcinUf: StandardComponent;
-  rvcinOhm: StandardComponent;
-  cddUf: StandardComponent;
+  cvccUf: StandardComponent;
+  vccVoltageV: number;
   rpgoodKohm: StandardComponent;
-  ruSonicOhm: StandardComponent;
+  rpgFilterOhm: StandardComponent;
+  cpgFilterNf: StandardComponent;
+  colNf: StandardComponent;
+
+  // Efficiency & Loss Breakdown
   estimatedEfficiency: number;
   estimatedPowerLossW: number;
   conductionLossW: number;
   switchingLossW: number;
   inductorDcrLossW: number;
+  quiescentLossW: number;
+
+  // Design Rule Check Warnings
   warnings: string[];
 }
 

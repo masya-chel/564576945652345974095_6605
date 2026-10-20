@@ -25,7 +25,7 @@ export const PythonExportModal: React.FC<PythonExportModalProps> = ({
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = 'sic461_calculator.py';
+    link.download = 'mpq8626_calculator.py';
     link.click();
     URL.revokeObjectURL(url);
   };
@@ -47,10 +47,10 @@ export const PythonExportModal: React.FC<PythonExportModalProps> = ({
             </div>
             <div>
               <h3 className="text-sm font-bold text-white">
-                Автономный Python-скрипт (sic461_calculator.py)
+                Автономный Python-скрипт (mpq8626_calculator.py)
               </h3>
               <p className="text-xs text-slate-400">
-                Чистый Python 3 без сторонних зависимостей. Поддерживает работу в консоли и импорт/экспорт JSON.
+                Чистый Python 3 без сторонних библиотек. Поддерживает запуск в терминале и импорт/экспорт конфигураций JSON.
               </p>
             </div>
           </div>
@@ -68,8 +68,8 @@ export const PythonExportModal: React.FC<PythonExportModalProps> = ({
         <div className="px-5 py-3 bg-slate-950/60 border-b border-slate-800/80 text-xs flex items-center gap-3 text-slate-300">
           <Terminal className="w-4 h-4 text-cyan-400 shrink-0" />
           <div className="flex flex-wrap gap-x-4 gap-y-1 font-mono text-[11px]">
-            <span>Запуск: <code className="text-cyan-300 font-bold">python sic461_calculator.py</code></span>
-            <span>С файлом JSON: <code className="text-cyan-300 font-bold">python sic461_calculator.py my_config.json</code></span>
+            <span>Запуск: <code className="text-cyan-300 font-bold">python mpq8626_calculator.py</code></span>
+            <span>С файлом JSON: <code className="text-cyan-300 font-bold">python mpq8626_calculator.py sample_preset_12v_1v8_6a.json</code></span>
           </div>
         </div>
 
@@ -81,7 +81,7 @@ export const PythonExportModal: React.FC<PythonExportModalProps> = ({
         {/* Modal Footer */}
         <div className="flex items-center justify-between p-4 bg-slate-950 border-t border-slate-800">
           <span className="text-xs text-slate-400">
-            Содержит текущие рассчитанные параметры ({inputs.vinNom}В → {inputs.vout}В @ {inputs.ioutMax}А)
+            Текущие параметры: {inputs.chipModel || 'MPQ8626GD'} ({inputs.vinNom}В → {inputs.vout}В @ {inputs.ioutMax}А)
           </span>
 
           <div className="flex items-center gap-2">
