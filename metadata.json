@@ -1,0 +1,6 @@
+{
+  "name": "SiC461 DC-DC Component Calculator",
+  "description": "Инженерный калькулятор компонентов синхронного понижающего DC-DC преобразователя Vishay SiC461 с подбором рядов E24/E96, интерактивной схемой и экспортом в JSON/Python.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

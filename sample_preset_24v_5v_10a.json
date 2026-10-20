@@ -1,0 +1,39 @@
+{
+  "device": "Vishay SiC461 Synchronous Buck Regulator",
+  "name": "Промышленный преобразователь 24В в 5В 10А",
+  "inputModes": {
+    "voutInputMode": "voltage",
+    "softStartInputMode": "time",
+    "uvloInputMode": "voltage"
+  },
+  "inputComponents": {
+    "rfb1Kohm": 52.5,
+    "rfb2Kohm": 10.0,
+    "cssNf": 31.25,
+    "ren1Kohm": 127.5,
+    "ren2Kohm": 10.0
+  },
+  "inputs": {
+    "vinNom": 24.0,
+    "vinMin": 18.0,
+    "vinMax": 32.0,
+    "vout": 5.0,
+    "ioutMax": 10.0,
+    "fswKhz": 500,
+    "kind": 0.3,
+    "voutRippleMaxMv": 30,
+    "loadStepA": 5.0,
+    "voltageOvershootMv": 150,
+    "tssMs": 5.0,
+    "vinStartUvlo": 16.5,
+    "vinStopUvlo": 15.1,
+    "voutInputMode": "voltage",
+    "softStartInputMode": "time",
+    "uvloInputMode": "voltage",
+    "rfb1Kohm": 52.5,
+    "rfb2Kohm": 10.0,
+    "cssNf": 31.25,
+    "ren1Kohm": 127.5,
+    "ren2Kohm": 10.0
+  }
+}
